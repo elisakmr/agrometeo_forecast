@@ -1,0 +1,128 @@
+---
+title: "Determinist scores"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+library(dplyr)
+library(tidyverse)
+library(plyr)
+library(easyVerification)
+library(verification)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+no_core <- 5
+
+```
+## Computing grid scores and saving them in arrays called "det_"
+
+```{r setup, include=FALSE}
+#
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+tictoc::tic()
+foreach(b=1:10, .packages='easyVerification') %dopar%  { # loop on bootstrap samples
+for (ind in 1:2){
+
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  nom_clim <- paste0(indic[ind],b,"_clim.RData")
+  nom_an_prev <- paste0(indic[ind],b,"_anomaly_prev.RData")
+  nom_an_clim <- paste0(indic[ind],b,"_anomaly_clim.RData")
+  nom_an_obs <- paste0(indic[ind],b,"_anomaly_obs.RData")
+  
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+  load(file = file.path(dir_data, "extract", nom_clim))
+  load(file = file.path(dir_data, "extract", nom_an_prev))
+  load(file = file.path(dir_data, "extract", nom_an_clim))
+  load(file = file.path(dir_data, "extract", nom_an_obs))
+  
+  
+  ## Score computing: We compute bias, and cross validated rmse and correlation coefficient.
+  
+  det_prev <- array(NA, dim = c(ngrids,3,ndimT))
+  det_clim <- array(NA, dim = c(ngrids,3,ndimT))
+  
+  for (t in 1:ndimT){ 
+  
+    # bias
+        # ref vs prev
+    biais_prev = veriApply("EnsMe", fcst=array_prev[,,,t], obs=array_obs[,,t])
+        # ref vs clim
+    biais_clim = veriApply("EnsMe", fcst=array_clim[,,,t], obs=array_obs[,,t])
+  
+    # rmse
+        # ref vs prev
+    rms_prev = veriApply("EnsRmse", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t])
+        # ref vs CLIM
+    rms_clim = veriApply("EnsRmse", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t])
+    
+    # anomaly correlation coefficient
+    
+    #diag(cor(t(anomaly_mean), t(obs_anomaly[,,t]))) # per row correlation
+    
+      # ref vs prev
+    acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t])
+      # ref vs clim
+    acc_clim <- veriApply("EnsCorr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t])
+  
+  det_prev[,,t] <- array(c(acc_prev, biais_prev, rms_prev), dim=c(ngrids,3))
+  det_clim[,,t] <- array(c(acc_clim, biais_clim, rms_clim), dim=c(ngrids,3))
+  
+  }
+  nom_prev <- paste0(indic[ind], b,"scoredet_grid_prev.RData")
+  nom_clim <- paste0(indic[ind], b,"scoredet_grid_clim.RData")
+  
+  save(det_prev, file = file.path(dir_data, "score", nom_prev))
+  save(det_clim, file = file.path(dir_data, "score", nom_clim))
+}
+}
+stopCluster(cl)
+tictoc::toc() 
+
+```
+## Computing box scores 
+
+We aggregate gridded deterministic scores with latitude weighting.
+21.72 sec elapsed
+
+```{r setup, include=FALSE}
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+tictoc::tic()
+foreach(b=1:10) %dopar%  { # loop on bootstrap samples
+load(file = file.path(dir_data, "extract", "lat.RData"))
+lati <- as.vector(vect_lat)
+
+for (ind in 1:2){
+  # loading gridded scores
+  nom_prev <- paste0(indic[ind], b,"scoredet_grid_prev.RData")
+  nom_clim <- paste0(indic[ind], b,"scoredet_grid_clim.RData")
+  load(file = file.path(dir_data, "score", nom_prev))
+  load(file = file.path(dir_data, "score", nom_clim))
+  
+  boxdet_prev <- matrix(nrow = ndimT, ncol = 3)
+  boxdet_clim <- matrix(nrow = ndimT, ncol = 3)
+  for (t in 1:ndimT){
+ # box aggregation with latitude weighting
+  boxdet_prev[t,] <- det_prev[i,,t]*cos(pi*lati[i,1]/180)
+  boxdet_clim[t,] <- det_prev[i,,t]*cos(pi*lati[i,1]/180)
+
+  }
+  nom_ps <- paste0(indic[ind], b,"scoredet_box_prev.RData")
+  nom_clim <- paste0(indic[ind], b,"scoredet_box_clim.RData")
+  
+  save(boxdet_prev, file = file.path(dir_data, "score", nom_ps))
+  save(boxdet_clim, file = file.path(dir_data, "score", nom_clim))
+
+}
+}
+stopCluster(cl)
+tictoc::toc() 
+
+```

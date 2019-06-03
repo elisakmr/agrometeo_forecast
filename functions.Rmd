@@ -1,0 +1,150 @@
+---
+title: "Functions"
+output: html_document
+---
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+library(dplyr)
+library(stats)
+
+```
+
+## Function transforming continuous into binary regarding specified event 
+Continuous array transformed into binary/ prob array with following dimensions: grid.year.dimt.event.
+
+```{r, include=FALSE, echo=FALSE}
+
+binprob <- function (x, nban, prob, rang, type){
+qsup<-list()
+qinf<-list()
+qsup_obs<-vector()
+qinf_obs<-vector()
+quant_obs <- vector()
+
+  if(type=="prev"){
+    #x <- as.data.frame(x)
+    for (year in 1:nban){
+      quant_ps <- as.numeric(quantile(as.vector(x[-year,]), prob))
+      qsup[[year]] <- which(x[year,]>=quant_ps)
+      qinf[[year]] <- which(x[year,]<quant_ps)
+    }
+    for (year in 1:nban){
+      if (rang=="H"){
+        x[year,qsup[[year]]] <- 1
+        x[year,qinf[[year]]] <- 0
+        
+      }
+    
+      else if (rang=="L"){
+        x[year,qsup[[year]]] <- 0
+        x[year,qinf[[year]]] <- 1
+      }
+    }
+    x <- apply(x,1,mean)
+  }
+  if (type == "obs"){
+    for (year in 1:nban){
+      quant_obs[year] <- as.numeric(quantile(x[-year], prob))
+    }
+    qsup_obs <- which(x >= quant_obs)
+    qinf_obs <- which(x < quant_obs)
+
+    if (rang=="H"){
+      x[qsup_obs]<- rep(1, length(qsup_obs))  
+      x[qinf_obs]<- rep(0, length(qinf_obs))
+    }
+   
+    else if (rang=="L"){
+      x[qsup_obs]<- rep(0, length(qsup_obs))  
+      x[qinf_obs]<- rep(1, length(qinf_obs))  
+    }
+  }
+  return(x) 
+}
+```
+## Function transforming continuous into binary (array > array)
+
+```{r setup, include=FALSE}
+tercquint <- function (type, array_cont, nanne, ncells, ndims){
+  array_binprob <- array(NA, dim=c(ncells, nanne, ndims, 4))
+  for (t in 1:ndimT){
+    for (i in 1:ngrids){
+      if (type == "obs") { int_df <- array_cont[i,,t] }
+      else if (type == "prev") { int_df <- array_cont[i,,,t] }
+          hterc_vect <- binprob(int_df, nban=nanne, prob=2/3, rang="H", type)
+          lterc_vect <- binprob(int_df, nban=nanne, prob=1/3, rang="L", type)
+          hquin_vect <- binprob(int_df, nban=nanne, prob=4/5, rang="H", type)
+          lquin_vect <- binprob(int_df, nban=nanne, prob=1/5, rang="L", type)
+  
+      array_binprob[i,,t,1:4] <- c(hterc_vect, lterc_vect, hquin_vect,lquin_vect) 
+    }
+  }
+  return(array_binprob)
+}
+```
+
+## RMSE and Bias
+
+```{r setup, include=FALSE}
+rmse <- function(observed, predicted){
+  sqrt(mean((observed - predicted)^2))
+}
+bias <- function(observed, predicted){
+  mean((observed - predicted))
+}
+```
+## ROC aggregated at box level
+# function computing scores for the box, weighting points as function of latitude
+
+```{r setup, include=FALSE}
+score_boite_prob = function(prev_prob, obs_bin, t, lati, nb_bin, e)
+{
+  # Calcul de HR et FAR pour scores ROC et diag de fiabilite sur des zones.
+  # Agregation des previsions probabilistes de chaque point,
+  # en applicant une ponderation.
+  # NB : les previsions sont exprimees en proba (entre 0. et 1.)  !!!!
+  # e= 1 > Higher tercile
+  # e= 2 > Lower tercile
+  # e= 3 > Higher quintile
+  # e= 4 > Lower quintile
+  
+  O=numeric(nb_bin)          # occurences bien prevues (hits)
+  NO=numeric(nb_bin)         # fausses alertes
+  HR=numeric(nb_bin)         # taux de bonnes previs agreges (pour ROC)
+  FAR=numeric(nb_bin)        # taux de fausses alertes (pour ROC)
+  HR_rel=numeric(nb_bin)     # taux bonnes previs par bin (pour diag fiabilite)
+  F_rel=numeric(nb_bin)      # freq des previs pour chaque bin (pour diag fiabilite)
+  # boucle sur les points de la zone
+  
+  for (bin in (1:nb_bin)) {
+    for (i in ngrids){
+        vect_prev <- prev_prob[i,,t,e]
+        vect_obs <- obs_bin[i,,t,e]
+        O[bin] = O[bin] + cos(pi*lati[i]/180)*length(which(vect_prev>=((bin-1)/nb_bin) 
+                                                           & vect_prev<(bin/nb_bin) & vect_obs==1))
+        NO[bin] = NO[bin] + cos(pi*lati[i]/180)*length(which(vect_prev>=((bin-1)/nb_bin) 
+                                                             & vect_prev<(bin/nb_bin) & vect_obs==0))
+      
+    }
+  }
+  
+  # cumuls (pour ROC)
+  for (bin in (1:nb_bin)) {
+    # pour courbe ROC
+    HR[bin] = sum(O[bin:nb_bin])/sum(O[])
+    FAR[bin] = sum(NO[bin:nb_bin])/sum(NO[])
+  }
+  # taux par bin (pour diag de fiabilite)
+  HR_rel=O/(O+NO)
+  F_rel=(O+NO)/sum(O[]+NO[])
+  
+  # calcul AUC (cf http://stackoverflow.com/questions/4954507/calculate-the-area-under-a-curve-in-r)
+  AUC=-sum(diff(FAR) * (head(HR,-1)+tail(HR,-1)))/2
+  
+  liste_score = list(HR=HR,FAR=FAR, HR=HR, FAR=FAR, AUC=AUC)
+  return(liste_score)
+  
+}
+```

@@ -1,0 +1,58 @@
+---
+title: "Probabilistic preparation"
+output: html_document
+duration: about a day
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+library(dplyr)
+library(stats)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+no_core <- 5
+
+```
+
+## Transforming continuous arrays 
+
+Regarding 4 selected events (higher/lower tercile/quintile) reference continuous values are transformed into binary values; ensemble prevision values are transformed into probabilistic values (computed from the ensemble spread). 
+
+```{r}
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+tictoc::tic()
+foreach(b=1:10, .packages="tidyverse", .export = 'tercquint') %dopar%  { # loop on bootstrap samples
+for (ind in 1:2){
+  
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  nom_clim <- paste0(indic[ind],b,"_clim.RData")
+  
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+  load(file = file.path(dir_data, "extract", nom_clim))
+
+  prob_ps <- tercquint("prev", array_prev, nan, ngrids, ndimT)
+  
+  prob_clim <- tercquint("prev", array_clim, nan, ngrids, ndimT)
+  
+  bin_ref <- tercquint("obs", array_obs, nan, ngrids, ndimT)
+  
+  nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
+  nom_clim <- paste0(indic[ind],b,"_prob_clim.RData")
+  nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
+  
+  save(prob_ps, file = file.path(dir_data, "extract", nom_prev))
+  save(prob_clim, file = file.path(dir_data, "extract", nom_clim))
+  save(bin_ref, file = file.path(dir_data, "extract", nom_ref))
+
+}
+}
+stopCluster(cl)
+tictoc::toc()
+```
+

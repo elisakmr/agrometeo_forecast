@@ -1,0 +1,144 @@
+---
+title: "score_proba"
+output: html_document
+67.26 sec elapsed
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+library(easyVerification)
+library(verification)
+library(dplyr)
+library(stats)
+library(SpecsVerification)
+library(s2dverification)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+no_core <- 5
+e <- 5 # number of events : auc h/l tercile/quintile + bs
+
+```
+
+## Loading latitude file
+
+To be used for weighted aggregation.
+
+```{r }
+load(file = file.path(dir_data, "extract", "lat.RData"))
+lati <- as.vector(vect_lat)
+
+```
+
+
+## Box-agregated scores
+
+Aggregation computed using latitude weighting
+
+```{r}
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+tictoc::tic()
+foreach(b=1:10, .export = 'score_boite_prob') %dopar%  { # loop on bootstrap samples
+  for (ind in 1:2){
+
+  nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
+  nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
+  nom_clim <- paste0(indic[ind],b,"_prob_clim.RData")
+ 
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+  load(file = file.path(dir_data, "extract", nom_clim))
+  
+  scor_ps <- list()
+  scor_clim <- list()
+  for (t in 1: ndimT){
+    int_ps <- list()
+    int_clim <- list()
+    for (e in 1:4){ #prev_prob, obs_bin, lati, nb_bin, e
+      int_ps[[e]] <- score_boite_prob(prob_ps, bin_ref, t, lati[,1], nb_bin = 5, e)
+      int_clim[[e]] <- score_boite_prob(prob_clim, bin_ref, t, lati[,1], nb_bin = 5, e)
+      
+    }
+    scor_ps[[t]] <- int_ps
+    scor_clim[[t]] <- int_clim
+  }
+  nom_ps <- paste0(indic[ind], b,"probbox_ps.RData")
+  nom_clim <- paste0(indic[ind], b,"probbox_clim.RData")
+  
+  save(scor_ps, file = file.path(dir_data, "score", nom_ps))
+  save(scor_clim, file = file.path(dir_data, "score", nom_clim))
+}
+}
+
+stopCluster(cl)
+tictoc::toc()
+
+```
+
+
+## Gridded scores
+
+Scores computed for each grid separately
+
+```{r}
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+tictoc::tic()
+foreach(b=1:1000, .packages = c('easyVerification', 's2dverification')) %dopar%  { # loop on bootstrap samples
+for (ind in 1:nindic){
+
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  nom_clim <- paste0(indic[ind],b,"_clim.RData")
+ 
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+  load(file = file.path(dir_data, "extract", nom_clim))
+  
+  nom_probps <- paste0(indic[ind],b,"_prob_prev.RData")
+  nom_climps <- paste0(indic[ind],b,"_prob_clim.RData")
+  nom_obsbin <- paste0(indic[ind],b,"_bin_obs.RData")
+
+  load(file = file.path(dir_data, "extract", nom_probps))
+  load(file = file.path(dir_data, "extract", nom_climps))
+  load(file = file.path(dir_data, "extract", nom_obsbin))
+  
+  scoreprob_ps <- array (NA, dim=c(ngrids,e,ndimT))
+  scoreprob_clim <- array (NA, dim=c(ngrids,e,ndimT))
+  
+  for (t in 1:ndimT){ 
+    # PREVISION
+  scoreprob_ps[,1,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat3 
+  scoreprob_ps[,2,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat1 
+  scoreprob_ps[,3,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat5 
+  scoreprob_ps[,4,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat1 
+  
+    # CLIMATO
+  scoreprob_clim[,1,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat3 
+  scoreprob_clim[,2,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat1 
+  scoreprob_clim[,3,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat5 
+  scoreprob_clim[,4,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat1 
+  
+    # BRIER SCORE
+    for (i in 1:ngrids){
+    scoreprob_ps[i,5,t] <- BrierScore(obs=bin_ref[i,,t,], pred=prob_ps[i,,t,], thresholds = seq(0, 1, 0.2))$bs
+    scoreprob_clim[i,5,t] <- BrierScore(obs=bin_ref[i,,t,], pred=prob_ps[i,,t,], thresholds = seq(0, 1, 0.2))$bs
+    }
+  }
+  nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
+  nom_clim <- paste0(indic[ind], b,"scoreprob_grid_clim.RData")
+  
+  save(scoreprob_ps, file = file.path(dir_data, "score", nom_prev))
+  save(scoreprob_clim, file = file.path(dir_data, "score", nom_clim))
+  
+}
+}
+
+stopCluster(cl)
+tictoc::toc()
+
+
+```

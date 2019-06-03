@@ -1,0 +1,95 @@
+---
+title: "Yearly ensemble spread graph"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+
+```
+
+
+## Loading files
+
+We load extracted indicator values, depending on indicator picked (to be specified just below).
+
+```{r file loading}
+# parameter specification
+ind <- 8 # indicator
+
+# file loading
+nom_ref <- paste0(indic[ind],"_ref.RData")
+nom_prev <- paste0(indic[ind],"_prev.RData")
+nom_clim <- paste0(indic[ind],"_clim.RData")
+nom_av_clim <- paste0(indic[ind],"_ensmean_clim.RData")
+nom_av_prev <- paste0(indic[ind],"_ensmean_prev.RData")
+
+load(file = file.path(dir_data, "extract", nom_ref))
+load(file = file.path(dir_data, "extract", nom_prev))
+load(file = file.path(dir_data, "extract", nom_clim))
+load(file = file.path(dir_data, "extract", nom_av_clim))
+load(file = file.path(dir_data, "extract", nom_av_prev))
+
+```
+## Ensemble variance 
+
+We compute and plot seasonal yearly ensemble variance for prevision and climatology.
+
+```{r }
+### data preparation: computing yearly seasonal ensemble variance for prevision and climatology
+df_value <- data.frame()
+for (y in 1:nan){
+  clim_values <- apply(array_clim[,y,,],c(1,2), mean) # seasonal averaging
+  prev_values <- apply(array_prev[,y,,],c(1,2), mean) # seasonal averaging
+  
+  var_prev <- mean(apply(prev_values,c(1), var))
+  var_clim <- mean(apply(clim_values,c(1), var))
+  
+  df_value <- rbind(df_value, data.frame(type = "prevision", year=an[y], value = var_prev))
+  df_value <- rbind(df_value, data.frame(type = "climato", year=an[y], value = var_clim))
+}
+### buidling up graph   
+  ggplot(df_value, aes(factor(year), value)) + geom_point(aes(fill=type, colour =type))+
+  labs(title = paste0(indic[ind], " variance spread"), x="Year", y= "Variance")
+  
+
+```
+## Ensemble anomaly spread
+
+We compute anomaly for prevision and climatology, following cross validation scheme: considered year is excluded from reference mean.
+
+```{r }
+### COMPUTING CROSS VALIDATED ANOMALY  ------------------------------------------------------------------------
+df_value <- data.frame()
+clim_seasmean <- apply(clim_mean[,,],c(1,2), mean) # seasonal averaging
+prev_seasmean <- apply(prev_mean[,,],c(1,2), mean) # seasonal averaging
+
+for (y in 1:nan){
+  ref_seasmean <- apply(array_obs[,-y,],c(1), mean) # average over season + years, omitting year y for crossval scheme
+  anomaly_ps <- prev_seasmean[,y] - ref_seasmean
+  anomaly_clim <- clim_seasmean[,y] - ref_seasmean
+  df_value <- rbind(df_value, data.frame(type = "model", year=an[y], value = anomaly_ps))
+  df_value <- rbind(df_value, data.frame(type = "climato", year=an[y], value = anomaly_clim))
+
+}
+  
+  
+### YEARLY BOXPLOTS  ------------------------------------------------------------------------
+  ggplot(df_value, aes(factor(year), value)) + geom_boxplot(aes(fill=type))+
+  labs(title = paste0(indic[ind], " anomaly spread"), x="Year", y= "Indicator value")
+  
+
+```

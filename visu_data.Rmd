@@ -1,0 +1,148 @@
+---
+title: "visu_data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+
+```
+
+
+## Loading files
+
+Extracted selected indicator values and grid coordinates loaded.
+
+```{r file loading}
+# parameter specification
+ind <- 2 # indicator
+
+# file loading
+nom_ref <- paste0(indic[ind],"_ref.RData")
+nom_prev <- paste0(indic[ind],"_prev.RData")
+nom_clim <- paste0(indic[ind],"_clim.RData")
+nom_av_clim <- paste0(indic[ind],"_ensmean_clim.RData")
+nom_av_prev <- paste0(indic[ind],"_ensmean_prev.RData")
+
+load(file = file.path(dir_data, "extract", nom_ref))
+load(file = file.path(dir_data, "extract", nom_prev))
+load(file = file.path(dir_data, "extract", nom_clim))
+load(file = file.path(dir_data, "extract", nom_av_clim))
+load(file = file.path(dir_data, "extract", nom_av_prev))
+
+load(file = file.path(dir_data, "extract", "lon.RData"))
+load(file = file.path(dir_data, "extract", "lat.RData"))
+
+```
+
+## Transforming data frames into raster
+
+We pick a year and compute the seasonal ensemble mean. then we transform dataframes into rasters using coordinates previously loaded. 
+
+```{r }
+
+# parameter specification
+year <- 2
+
+# averaging over t dimension
+clim_values <- apply(clim_mean[,year,],c(1), mean)
+prev_values <- apply(prev_mean[,year,],c(1), mean)
+obs_values <- apply(array_obs[,year,],c(1), mean)
+
+# creating shapefiles of values to be plotted
+df_prev <- data.frame(longitude=vect_lon, latitude=vect_lat, indicator=prev_values)
+df_clim <- data.frame(longitude=vect_lon, latitude=vect_lat, indicator=clim_values)
+df_obs <- data.frame(longitude=vect_lon, latitude=vect_lat, indicator=obs_values)
+
+coordinates(df_prev) <- ~lon+lat ### ISSUES COLUMN NAMING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+coordinates(df_clim) <- ~lon+lat
+coordinates(df_obs) <- ~lon+lat
+
+proj4string(df_prev) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+proj4string(df_clim) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+proj4string(df_obs) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+
+sp_prev <- st_as_sf(df_prev)
+sp_clim <- st_as_sf(df_clim)
+sp_obs <- st_as_sf(df_obs)
+
+plot(sp_prev, nbreaks = 40)
+plot(sp_clim, nbreaks = 40)
+plot(sp_obs, nbreaks = 40)
+
+# transform shp into raster to get data extent 
+ras_prev <- raster(sp_prev)
+ras_clim <- raster(sp_clim)
+ras_obs <- raster(sp_obs)
+
+ext_prev <- extent(ras_prev)
+ext_clim <- extent(ras_clim)
+ext_obs <- extent(ras_obs)
+
+# create background raster 
+mask.raster <- raster(resolution=c(0.1,0.07), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", ## !!!!!!!!!!!
+                      ext = ext_prev)
+
+# convert the shapefile to a raster based on background raster
+ras_prev_complete <- rasterize(sp_prev, mask.raster)
+ras_clim_complete <- rasterize(sp_clim, mask.raster)
+ras_obs_complete <- rasterize(sp_obs, mask.raster)
+
+plot(ras_prev_complete$indicator)
+
+```
+### Mapping indicator values
+
+Now that we have transformed the data frame into a raster we will map them using 'tmap' package, and save the maps all together using 'tmap_arrange' function.
+
+```{r }
+titre_prev <- paste0("Prevision ensemble seasonal mean ", an[year])
+titre_clim <- paste0("Climato ensemble seasonal mean ", an[year])
+titre_obs <- paste0("Reference seasonal mean ", an[year])
+
+data("World")
+ramp = colorRampPalette(c("lightblue", "red"))
+relief_shp <- st_read(dsn=file.path(dir_data, "communes-20190101.shp")) #  to be replaces by rivers etc...?????
+riviere_shp <- st_read(dsn=file.path(dir_data, "relief_naturel.shp")) #  to be replaces by rivers etc...?????
+
+prev_map <- tm_shape(ras_prev_complete$indicator)+
+  tm_raster( title = titre_prev, palette = '-RdBu',
+             legend.reverse = TRUE)+
+  tm_legend(outside=TRUE, hist.width=2)+
+  tm_layout(legend.position = c("left", "bottom"))
+
+clim_map <- tm_shape(ras_clim_complete$indicator)+
+  tm_raster( title = titre_clim, palette = '-RdBu',
+             legend.reverse = TRUE)+
+  tm_legend(outside=TRUE, hist.width=2)+
+  tm_layout(legend.position = c("left", "bottom"))
+
+obs_map <- tm_shape(ras_obs_complete$indicator)+
+  tm_raster( title = titre_obs, palette = '-RdBu',
+             legend.reverse = TRUE)+
+  tm_legend(outside=TRUE, hist.width=2)+
+  tm_layout(legend.position = c("left", "bottom"))
+
+### SAVING MAP    -------------------------------------------------------------------------------------
+tiff(paste0(an[year], " seasonal_ens_mean.tiff"), width = 8, height = 5, units = 'in', res = 300, compression = 'none')
+tmap_arrange(prev_map, clim_map, obs_map, asp = 1)
+dev.off()
+
+```
+
+
+
+
+
+

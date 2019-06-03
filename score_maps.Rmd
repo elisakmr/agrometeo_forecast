@@ -1,0 +1,41 @@
+---
+title: "Score mapping"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+# parameter specification
+ind <- 2 # indicator
+b <- 56 # bootstrapped sample
+
+```
+
+## Loading files
+
+We load indicator values previously extracted, related to prevision, climatology, or observation. We also load grid coordinate dataframes, required further for mapping.        
+
+```{r file loading}
+
+# file loading
+nom_prev <- paste0(indic[ind], b,"scoredet_grid_prev.RData")
+nom_clim <- paste0(indic[ind], b,"scoredet_grid_clim.RData")
+
+load(file = file.path(dir_data, "score", nom_prev))
+load(file = file.path(dir_data, "score", nom_clim))
+
+load(file = file.path(dir_data, "extract", "lon.RData"))
+load(file = file.path(dir_data, "extract", "lat.RData"))
+
+```
