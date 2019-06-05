@@ -1,5 +1,5 @@
 ---
-title: "visu_skilledprev"
+title: "Visualization of skilled previsions"
 output: html_document
 ---
 
@@ -7,68 +7,25 @@ output: html_document
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
 no_core <- 5
-seuil <- 1# upper/lower tercile or quintile
-ind <- 2# indicator selecte
-mois <- 3# selected month: 1=may; 6=october
-point <- 51# grid index to be used for the normality assessment
-```
-
-## Combining prevision and skills
-
-We summarize skill scores over all bootstrapped samples
-
-```{r}
-score_ps <- matrix(ncol = 1000, nrow = ngrids)
-score_clim <- matrix(ncol = 1000, nrow = ngrids)
-
-for (b in 1:1000)  { 
-  # scoreprob_ dim=c(ngrids,e,ndimT)
-  nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
-  nom_clim <- paste0(indic[ind], b,"scoreprob_grid_clim.RData")
-  load(file = file.path(dir_data, "score", nom_prev))
-  load(file = file.path(dir_data, "score", nom_clim))
-
-  score_ps[,b] <- scoreprob_ps[,seuil, mois]
-  score_clim[,b] <- scoreprob_clim[,seuil, mois]
-}
 
 ```
 
-## Statistical tests
+## R Markdown
 
-We compute Wilcoxon test on prevision and climatological skill scores to evaluate the 
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
-
-     # visual assessment of normality - computed per grid
-par(mfrow=c(1,2))
-hist(score_ps[point,],freq=F)
-qqnorm(score_ps[point,])
-qqline(score_ps[point,]) #bug
-
-    # Wilcoxon test computing
-wilcox_df <- matrix(data = 0, ncol = 4, nrow = ngrids)
-for (i in 1:ngrids)  { 
-  #  wilcoxon test
-w1 <- wilcox.test(x = score_clim[i,], y = score_ps[i,] ,alternative = "less", paired = TRUE, conf.level = 0.95)
-w2 <- wilcox.test(x = score_clim[i,], y = score_ps[i,] ,alternative = "less", paired = TRUE, conf.level = 0.90)
-w3 <- wilcox.test(x = score_clim[i,], y = score_ps[i,] ,alternative = "less", paired = TRUE, conf.level = 0.80)
-
-  if (w1$p.value < 0.05) {
-    wilcox_df[i,2] <- 1 
-  }
-  if (w2$p.value < 0.05) {
-    wilcox_df[i,3] <- 1 
-  }
-  if (w3$p.value < 0.05) {
-    wilcox_df[i,4] <- 1 
-  }
-}
-  # summarize score over bootstrapped samples
-wilcox_df[,1] <- apply(score_ps, 1, mean, na.rm = TRUE)
-
-
-
+plot(pressure)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

@@ -18,7 +18,7 @@ library(iterators)
 library(parallel)
 library(doParallel)
 no_core <- 5
-e <- 5 # number of events : auc h/l tercile/quintile + bs
+e <- 4 # number of events : auc h/l tercile/quintile 
 
 ```
 
@@ -87,8 +87,9 @@ Scores computed for each grid separately
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:1000, .packages = c('easyVerification', 's2dverification')) %dopar%  { # loop on bootstrap samples
-for (ind in 1:nindic){
+foreach(b=1:10, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
+
+  for (ind in 1:2){
 
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
   nom_prev <- paste0(indic[ind],b,"_prev.RData")
@@ -106,26 +107,30 @@ for (ind in 1:nindic){
   load(file = file.path(dir_data, "extract", nom_climps))
   load(file = file.path(dir_data, "extract", nom_obsbin))
   
-  scoreprob_ps <- array (NA, dim=c(ngrids,e,ndimT))
-  scoreprob_clim <- array (NA, dim=c(ngrids,e,ndimT))
+  scoreprob_ps <- array (NA, dim=c(ngrids,ndimT,e))
+  scoreprob_clim <- array (NA, dim=c(ngrids,ndimT,e))
   
-  for (t in 1:ndimT){ 
-    # PREVISION
-  scoreprob_ps[,1,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat3 
-  scoreprob_ps[,2,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat1 
-  scoreprob_ps[,3,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat5 
-  scoreprob_ps[,4,t] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat1 
-  
-    # CLIMATO
-  scoreprob_clim[,1,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat3 
-  scoreprob_clim[,2,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat1 
-  scoreprob_clim[,3,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat5 
-  scoreprob_clim[,4,t] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5)$cat1 
-  
-    # BRIER SCORE
+  for (t in 1:ndimT){
     for (i in 1:ngrids){
-    scoreprob_ps[i,5,t] <- BrierScore(obs=bin_ref[i,,t,], pred=prob_ps[i,,t,], thresholds = seq(0, 1, 0.2))$bs
-    scoreprob_clim[i,5,t] <- BrierScore(obs=bin_ref[i,,t,], pred=prob_ps[i,,t,], thresholds = seq(0, 1, 0.2))$bs
+    # PREVISION
+ 
+    # scoreprob_ps[i,t,1] <- roc.area(bin_ref[i,,t,1], prob_ps[i,,t,1])$A
+    # scoreprob_ps[i,t,2] <- roc.area(bin_ref[i,,t,2], prob_ps[i,,t,2])$A
+    # scoreprob_ps[i,t,3] <- roc.area(bin_ref[i,,t,3], prob_ps[i,,t,3])$A
+    # scoreprob_ps[i,t,4] <- roc.area(bin_ref[i,,t,4], prob_ps[i,,t,4])$A
+    # 
+     #EnsRoca(prob_ps[,,t,3], bin_ref[,,t,3])
+     scoreprob_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat3 
+     scoreprob_ps[,t,2] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat1 
+     scoreprob_ps[,t,3] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat5 
+     scoreprob_ps[,t,4] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat1 
+    #veriApply("EnsRoca", fcst=array_prev[19,,,t], obs=array_obs[19,,t], prob=1:4/5, parallel = TRUE)$cat5
+      # CLIMATO
+     scoreprob_clim[,t,1] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat3 
+     scoreprob_clim[,t,2] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat1 
+     scoreprob_clim[,t,3] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat5 
+     scoreprob_clim[,t,4] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat1 
+     # 
     }
   }
   nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
