@@ -1,0 +1,61 @@
+---
+title: "mapping_prev"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+```
+## Parameter specifications
+
+Indicator to be displayed
+Month
+Region of interest
+
+```{r}
+titre_prev <- "gngn"
+
+```
+## Loading shapefiles
+
+Using tmap package
+
+```{r}
+nom <- 
+load()
+```
+## Creating maps displaying prevision and skill shapefiles
+
+Using tmap package
+
+```{r}
+titre_prev <- "gngn"
+ 
+### STATIC MAP
+tmap_mode('plot')
+qtm(shp_wilcox, fill = "wilcoxon", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", legend.stack = "horizontal", legend.frame=TRUE, attr.outside = TRUE, legend.title.size = 0.8, legend.text.size = 0.5, basemaps = franceMapEnv)+
+  qtm(shp_tercile, fill = "tercile")+
+  tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = FALSE, alpha = 0, labels.rot = c(0,90))+
+  tm_scale_bar()+
+  tm_layout(franceMapEnv)
+
+#interactive map
+tmap_mode('view')
+qtm(shp_wilcox, fill = "wilcoxon", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", legend.stack = "horizontal", legend.frame=TRUE, attr.outside = TRUE, legend.title.size = 0.8, legend.text.size = 0)+
+  qtm(shp_tercile, fill = "tercile", alpha = 0)+
+  tm_scale_bar()+
+  tm_layout(franceMapEnv)
+
+```

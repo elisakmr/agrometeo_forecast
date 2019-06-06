@@ -1,0 +1,88 @@
+---
+title: "Mapping skilled probabilistic prevision"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+```
+
+## Parameter setting 
+
+```{r}
+variable <- 2
+mois <- 4
+```
+
+## Preparing the dataframe containing previsions and associated skills
+
+We create a conversion-to-shapefile ready dataframe containing the most likely tercile and the values of Wilcoxon test. 
+
+```{r}
+# loading dataframe of prevision with associated skills and coordinates
+
+nom <- paste0(indic[variable],"_skilledprev.RData")
+load(file = file.path(dir_data, "score", nom))
+load(file = file.path(dir_data, "extract", "lon.RData"))
+load(file = file.path(dir_data, "extract", "lat.RData"))
+
+# creating a table containing most likely tercile and its associated wilcoxon outcome, with both coordinates (shape ready for shapefile conversion)
+
+matrix4shp <- matrix(1, nrow = ngrids, ncol = 4)
+
+for (i in 1:ngrids) {
+  if (wilcox_df[i,mois,1,1]<wilcox_df[i,mois,1,2]) # i.e. first tercile most likely to happen
+  {matrix4shp[i,1] <- 3
+   matrix4shp[i,2] <- wilcox_df[i,mois,3,2] # extracting wilcoxon score associated to the most likely tercile
+    }
+}
+matrix4shp[,3] <- unlist(vect_lat)
+matrix4shp[,4] <- unlist(vect_lon)
+
+
+```
+
+
+## Converting the dataframe into shapefiles
+
+We create two polygon shapefiles: one containing most likely tercile forecasted; one containing wilcoxon test outcomes. 
+
+```{r}
+# we load the dataframe previously built
+df_shp <- data.frame(matrix4shp)
+colnames(df_shp) <- c("tercile", "wilcoxon","lat","lon")
+coordinates(df_shp) <- ~lon+lat
+proj4string(df_shp) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+sp_prev <- st_as_sf(df_shp)
+ras_prev <- raster(sp_prev)
+ext_prev <- extent(ras_prev)
+mask.raster <- raster(resolution=c(0.1,0.1), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", ## !!!!!!!!!!!
+                      ext = ext_prev)
+ras_prev_complete <- rasterize(sp_prev, mask.raster)
+
+# we build the shapefile of most likely tercile 
+sp_tercile <- rasterToPolygons(ras_prev_complete$tercile)
+shp_tercile <- st_as_sf(sp_tercile)
+plot(shp_tercile)
+st_write(shp_tercile, "liketercile.shp")
+
+# we build the shapefile of most likely tercile 
+sp_wilcox <- rasterToPolygons(ras_prev_complete$wilcoxon)
+shp_wilcox <- st_as_sf(sp_wilcox)
+plot(shp_wilcox)
+st_write(shp_wilcox, "wilcox.shp")
+```
+
+
