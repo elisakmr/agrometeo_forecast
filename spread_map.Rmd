@@ -87,6 +87,7 @@ ras_prev_complete <- rasterize(sp_prev, mask.raster)
 ras_clim_complete <- rasterize(sp_clim, mask.raster)
 
 plot(ras_prev_complete$indicator)
+
 ```
 ### Mapping ensemble spread
 
