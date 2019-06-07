@@ -17,13 +17,15 @@ library(rgdal)
 library(tmap)
 library(sf)
 library(ggmap)
+
 ```
 
 ## Parameter setting 
 
 ```{r}
-variable <- 2
-mois <- 4
+moi <- c("May","June","July","August","September","October","November")
+select_var <- 2
+select_t <- 4
 ```
 
 ## Preparing the dataframe containing previsions and associated skills
@@ -33,7 +35,7 @@ We create a conversion-to-shapefile ready dataframe containing the most likely t
 ```{r}
 # loading dataframe of prevision with associated skills and coordinates
 
-nom <- paste0(indic[variable],"_skilledprev.RData")
+nom <- paste0(indic[select_var],"_skilledprev.RData")
 load(file = file.path(dir_data, "score", nom))
 load(file = file.path(dir_data, "extract", "lon.RData"))
 load(file = file.path(dir_data, "extract", "lat.RData"))
@@ -43,9 +45,9 @@ load(file = file.path(dir_data, "extract", "lat.RData"))
 matrix4shp <- matrix(1, nrow = ngrids, ncol = 4)
 
 for (i in 1:ngrids) {
-  if (wilcox_df[i,mois,1,1]<wilcox_df[i,mois,1,2]) # i.e. first tercile most likely to happen
+  if (wilcox_df[i,mois,1,1]<wilcox_df[i,select_t,1,2]) # i.e. first tercile most likely to happen
   {matrix4shp[i,1] <- 3
-   matrix4shp[i,2] <- wilcox_df[i,mois,3,2] # extracting wilcoxon score associated to the most likely tercile
+   matrix4shp[i,2] <- wilcox_df[i,select_t,3,2] # extracting wilcoxon score associated to the most likely tercile
     }
 }
 matrix4shp[,3] <- unlist(vect_lat)
@@ -76,13 +78,15 @@ ras_prev_complete <- rasterize(sp_prev, mask.raster)
 sp_tercile <- rasterToPolygons(ras_prev_complete$tercile)
 shp_tercile <- st_as_sf(sp_tercile)
 plot(shp_tercile)
-st_write(shp_tercile, "liketercile.shp")
+titre_terc <- paste0(indic[select_var], "_likelytercile_", moi[select_t],".shp")
+st_write(shp_tercile, titre_terc, delete_dsn=TRUE)
 
 # we build the shapefile of most likely tercile 
 sp_wilcox <- rasterToPolygons(ras_prev_complete$wilcoxon)
 shp_wilcox <- st_as_sf(sp_wilcox)
 plot(shp_wilcox)
-st_write(shp_wilcox, "wilcox.shp")
+titre_wil <- paste0(indic[select_var], "_wilcox_", moi[select_t],".shp")
+st_write(shp_wilcox, titre_wil, delete_dsn=TRUE)
 ```
 
 

@@ -25,37 +25,50 @@ Month
 Region of interest
 
 ```{r}
-titre_prev <- "gngn"
-
+select_var <- 2
+select_t <- 4
+moi <- c("May","June","July","August","September","October","November")
 ```
 ## Loading shapefiles
 
 Using tmap package
 
 ```{r}
-nom <- 
-load()
+titre_terc <- paste0(indic[select_var], "_likelytercile_", moi[select_t],".shp")
+titre_wil <- paste0(indic[select_var], "_wilcox_", moi[select_t],".shp")
+
+shp_tercile <- readOGR(dsn=file.path(dir_plot, "season", titre_terc))
+shp_wilcox <- readOGR(dsn=file.path(dir_plot, "season", titre_wil))
+
 ```
 ## Creating maps displaying prevision and skill shapefiles
 
 Using tmap package
 
 ```{r}
-titre_prev <- "gngn"
+titre <- paste0(indic[select_var], " prevision for ", moi[select_t])
  
 ### STATIC MAP
 tmap_mode('plot')
-qtm(shp_wilcox, fill = "wilcoxon", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", legend.stack = "horizontal", legend.frame=TRUE, attr.outside = TRUE, legend.title.size = 0.8, legend.text.size = 0.5, basemaps = franceMapEnv)+
-  qtm(shp_tercile, fill = "tercile")+
-  tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = FALSE, alpha = 0, labels.rot = c(0,90))+
-  tm_scale_bar()+
-  tm_layout(franceMapEnv)
 
+qtm(shp_tercile, fill = "tercile", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", 
+    legend.stack = "horizontal", legend.frame=FALSE, attr.outside = TRUE, legend.title.size = 0.8, 
+    legend.text.size = 0.5, title = titre, title.position = c("left","bottom"), fill.style="fixed",fill.breaks=c(1,2,3))+
+tm_shape(shp_wilcox)+
+  tm_symbols(size ="wilcoxon", col = "pink", style = "fixed", breaks = c(0,0.5,1))+
+tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = FALSE, alpha = 0, labels.rot = c(0,90))+
+tm_scale_bar()+
+  tm_legend()
+
+##
 #interactive map
 tmap_mode('view')
-qtm(shp_wilcox, fill = "wilcoxon", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", legend.stack = "horizontal", legend.frame=TRUE, attr.outside = TRUE, legend.title.size = 0.8, legend.text.size = 0)+
-  qtm(shp_tercile, fill = "tercile", alpha = 0)+
+
+qtm(shp_tercile, fill = "tercile",
+                 fill.style="fixed",fill.breaks=c(1,2,3))+
+  qtm(shp_wilcox, fill = "white", symbols.col = "wilcoxon", symbols.style="fixed", symbols.breaks=c(0,0.2,1))+
   tm_scale_bar()+
-  tm_layout(franceMapEnv)
+  tm_layout(franceMapEnv)+
+  tm_layout(titre)
 
 ```
