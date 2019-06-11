@@ -25,7 +25,7 @@ library(ggmap)
 ```{r}
 moi <- c("May","June","July","August","September","October","November")
 select_var <- 2
-select_t <- 4
+select_t <- 3
 ```
 
 ## Preparing the dataframe containing previsions and associated skills

@@ -28,6 +28,10 @@ Region of interest
 select_var <- 2
 select_t <- 4
 moi <- c("May","June","July","August","September","October","November")
+ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
+             "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
+ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy days","Number of days T max > 25°C", 
+             "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
 ```
 ## Loading shapefiles
 
@@ -46,29 +50,32 @@ shp_wilcox <- readOGR(dsn=file.path(dir_plot, "season", titre_wil))
 Using tmap package
 
 ```{r}
-titre <- paste0(indic[select_var], " prevision for ", moi[select_t])
+shp_wilcox$wilcoxon[which(shp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+titre <- paste0(ind_eng[select_var], " prevision for ", moi[select_t])
  
 ### STATIC MAP
-tmap_mode('plot')
+tmap_mode('plot') # Rtools package not available for current R version, preventing basemap to be added (read_osm function)
 
 qtm(shp_tercile, fill = "tercile", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", 
-    legend.stack = "horizontal", legend.frame=FALSE, attr.outside = TRUE, legend.title.size = 0.8, 
-    legend.text.size = 0.5, title = titre, title.position = c("left","bottom"), fill.style="fixed",fill.breaks=c(1,2,3))+
+    attr.outside = TRUE, legend.title.size = 0.8, fill.palette = "Blues",
+    legend.text.size = 0.5, title = titre, title.position = c("left","bottom"), fill.style="fixed",fill.breaks=c(1,2,3),
+    borders = NULL, fill.alpha = 0.5)+
 tm_shape(shp_wilcox)+
-  tm_symbols(size ="wilcoxon", col = "pink", style = "fixed", breaks = c(0,0.5,1))+
+  tm_symbols(size ="wilcoxon", col = "red", legend.size.show = FALSE)+
 tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = FALSE, alpha = 0, labels.rot = c(0,90))+
 tm_scale_bar()+
   tm_legend()
 
-##
-#interactive map
+### INTERACTIVE MAP
 tmap_mode('view')
 
-qtm(shp_tercile, fill = "tercile",
-                 fill.style="fixed",fill.breaks=c(1,2,3))+
-  qtm(shp_wilcox, fill = "white", symbols.col = "wilcoxon", symbols.style="fixed", symbols.breaks=c(0,0.2,1))+
+  qtm(shp_tercile, fill = "tercile",
+                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = "Blues", borders = NULL, fill.alpha=0.5)+  
+  tm_shape(shp_tercile)+
+  tm_fill(col ="tercile", alpha=0.5, palette = "Blues", legend.show = FALSE)+
+     tm_shape(shp_wilcox)+
+        tm_symbols(size ="wilcoxon", col = "red", alpha=1)+
   tm_scale_bar()+
-  tm_layout(franceMapEnv)+
-  tm_layout(titre)
-
+  tm_layout(titre) 
+  
 ```
