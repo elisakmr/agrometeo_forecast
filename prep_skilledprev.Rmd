@@ -33,9 +33,6 @@ for (b in 1:10)  {
   load(file = file.path(dir_data, "score", nom_prev))
   load(file = file.path(dir_data, "score", nom_clim))
   
-  nom_ps <- paste0(indic[ind],b,"_prob_prev.RData")
-  load(file = file.path(dir_data, "extract", nom_ps))
-
   score_ps[,,e,b] <- scoreprob_ps[,,e]
   score_clim[,,e,b] <- scoreprob_clim[,,e]
   
@@ -49,8 +46,9 @@ for (b in 1:10)  {
 ## Statistical tests
 
 We compute Wilcoxon test on prevision and climatological skill scores to evaluate the differences, at 95% confidence level. Here we consider only the two events Upper Tercile and Lower Tercile.
-We save in one array wilcoxon test outcome with both skill and prevision summaries. The dimensions of the arrays are the following:
-grids.tdim.3(=prob prevision + score + wilcoxon test).event
+We save in one array wilcoxon test outcome and skills and prevision summaries. The dimensions of the array is the following:
+grids.tdim.2(= wilcoxon test + score).event.
+We summarize in another array 
 
 ```{r pressure, echo=FALSE}
 
@@ -62,7 +60,7 @@ qqline(score_ps[point,]) #bug
 
     # Wilcoxon test 
     #
-wilcox_df <- array(0, dim=c(ngrids, ndimT,3,event)) 
+wilcox_df <- array(0, dim=c(ngrids, ndimT,2,event)) 
 
 for (i in 1:ngrids)  { 
 for (t in 1:ndimT)  { 
@@ -71,23 +69,19 @@ wht <- wilcox.test(x = score_clim[i,t,1,], y = score_ps[i,t,1,] ,alternative = "
 wlt <- wilcox.test(x = score_clim[i,t,2,], y = score_ps[i,t,2,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
 
   if (wht$p.value < 0.05) {
-    wilcox_df[i,t,3,1] <- 1 
+    wilcox_df[i,t,2,1] <- 1 
   }
   if (wlt$p.value < 0.05) {
-    wilcox_df[i,t,3,2] <- 1 
+    wilcox_df[i,t,2,2] <- 1 
   }
 }
 }
   # summarize score over bootstrapped samples
-wilcox_df[,,2,1] <- apply(score_ps[,,,1], c(1,2), mean, na.rm = TRUE)
-wilcox_df[,,2,2] <- apply(score_ps[,,,2], c(1,2), mean, na.rm = TRUE)
 
-  # summarize prevision over bootstrapped samples and model runs
-wilcox_df[,,1,1] <- apply(prev_prob[,,,1,], c(1,3), mean, na.rm = TRUE)
-wilcox_df[,,1,2] <- apply(prev_prob[,,,2,], c(1,3), mean, na.rm = TRUE)
+wilcox_df[,,1,1] <- apply(score_ps[,,,1], c(1,2), mean, na.rm = TRUE)
+wilcox_df[,,1,2] <- apply(score_ps[,,,2], c(1,2), mean, na.rm = TRUE)
 
-
-nom <- paste0(indic[ind],"_skilledprev.RData")
+nom <- paste0(indic[ind],"_skills.RData")
 save(wilcox_df, file = file.path(dir_data, "score", nom))
 
 ```

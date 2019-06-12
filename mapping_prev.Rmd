@@ -26,7 +26,8 @@ Region of interest
 
 ```{r}
 select_var <- 2
-select_t <- 4
+select_t <- 3
+select_y <- 2
 moi <- c("May","June","July","August","September","October","November")
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -38,8 +39,8 @@ ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy day
 Using tmap package
 
 ```{r}
-titre_terc <- paste0(indic[select_var], "_likelytercile_", moi[select_t],".shp")
-titre_wil <- paste0(indic[select_var], "_wilcox_", moi[select_t],".shp")
+titre_terc <- paste0(indic[select_var], "_likelytercile_", moi[select_t],an[select_y],".shp")
+titre_wil <- paste0(indic[select_var], "_wilcox_", moi[select_t],an[select_y],".shp")
 
 shp_tercile <- readOGR(dsn=file.path(dir_plot, "season", titre_terc))
 shp_wilcox <- readOGR(dsn=file.path(dir_plot, "season", titre_wil))
@@ -51,7 +52,7 @@ Using tmap package
 
 ```{r}
 shp_wilcox$wilcoxon[which(shp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
-titre <- paste0(ind_eng[select_var], " prevision for ", moi[select_t])
+titre <- paste0(ind_eng[select_var], " prevision for ", moi[select_t], " ", an[select_y])
  
 ### STATIC MAP
 tmap_mode('plot') # Rtools package not available for current R version, preventing basemap to be added (read_osm function)
@@ -77,5 +78,14 @@ tmap_mode('view')
         tm_symbols(size ="wilcoxon", col = "red", alpha=1)+
   tm_scale_bar()+
   tm_layout(titre) 
+
+### ANIMATED MAP
+
+aniam <- tm_shape(shp_tercile) + 
+	      tm_fill(col ="tercile", alpha=0.5, palette = "Blues", legend.show = FALSE)+
+	  tm_facets(along = "name")
+
+tmap_animation(m1, filename="Dutch_provinces.gif", width=800, delay=40)
+
   
 ```

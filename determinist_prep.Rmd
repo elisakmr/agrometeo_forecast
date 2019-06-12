@@ -43,6 +43,8 @@ for (ind in 1:2){
   # ENSEMBLE MEAN: we compute and save arrays of ensemble mean.
 
   prev_mean <- array(NA,dim=c(ngrids,nan,ndimT))
+  clim_mean <- array(NA,dim=c(ngrids,nan,ndimT))
+
   for (t in 1: ndimT){
     for (y in 1:nan){
       list_prev <- list()
