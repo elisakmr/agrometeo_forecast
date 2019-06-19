@@ -71,13 +71,14 @@ tm_scale_bar()+
 tmap_mode('view')
 
   qtm(shp_tercile, fill = "tercile",
-                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = "Blues", borders = NULL, fill.alpha=0.5)+  
+                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = "Blues", borders = NULL, fill.alpha=0.5, 
+      fill.legend.show = FALSE, title = titre, main.title.position = c(""))+  
   tm_shape(shp_tercile)+
-  tm_fill(col ="tercile", alpha=0.5, palette = "Blues", legend.show = FALSE)+
+  tm_fill(col ="tercile", alpha=0.5, palette = c("dodgerblue3","darkslategray2"), legend.show = FALSE)+
      tm_shape(shp_wilcox)+
         tm_symbols(size ="wilcoxon", col = "red", alpha=1)+
   tm_scale_bar()+
-  tm_layout(titre) 
+  tm_add_legend(type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))
 
 ### ANIMATED MAP
 
@@ -87,5 +88,6 @@ aniam <- tm_shape(shp_tercile) +
 
 tmap_animation(m1, filename="Dutch_provinces.gif", width=800, delay=40)
 
+tm_symbols()
   
 ```

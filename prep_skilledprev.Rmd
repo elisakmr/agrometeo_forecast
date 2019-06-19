@@ -4,41 +4,70 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+library(stats)
+
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
-library(stats)
+
 no_core <- 5
-ind <- 2# indicator selecte
-point <- 51# grid index to be used for the normality assessment
 event <-2
 ```
 
 ## Combining prevision and skills
 
-We save in one array skill scores over all bootstrapped samples, one for higher and one for lower tercile.
-In a same vein, we save in one array probabilistic prevision over all bootstrapped samples, one for higher and one for lower tercile.
-
+We save in one array skill scores over all bootstrapped samples, one for higher and one for lower tercile, and their associated Wilcoxon test outcomes. The test evaluates whether the prevision predicts better than the climatology, at 0.95 confidence level. 
 
 ```{r}
-score_ps <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
-score_clim <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
-prev_prob <- array(NA, dim=c(ngrids, nan, ndimT, event, 10)) 
+for (ind in 1:2){
 
-for (b in 1:10)  { 
-
-  for (e in 1:2){
-
-  nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
-  nom_clim <- paste0(indic[ind], b,"scoreprob_grid_clim.RData")
-  load(file = file.path(dir_data, "score", nom_prev))
-  load(file = file.path(dir_data, "score", nom_clim))
+  score_ps <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
+  score_clim <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
+  prev_prob <- array(NA, dim=c(ngrids, nan, ndimT, event, 10)) 
   
-  score_ps[,,e,b] <- scoreprob_ps[,,e]
-  score_clim[,,e,b] <- scoreprob_clim[,,e]
+      # loading scores (to be summarized later)
   
-  prev_prob[,,,e,b] <- prob_ps[,,,e]
+  for (b in 1:10)  { 
   
+    for (e in 1:2){
+  
+    nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
+    nom_clim <- paste0(indic[ind], b,"scoreprob_grid_clim.RData")
+    load(file = file.path(dir_data, "score", nom_prev))
+    load(file = file.path(dir_data, "score", nom_clim))
+    
+    score_ps[,,e,b] <- scoreprob_ps[,,e]
+    score_clim[,,e,b] <- scoreprob_clim[,,e]
+    
+    prev_prob[,,,e,b] <- prob_ps[,,,e]
+    
+    }
   }
+      # extracting Wilcoxon test outcomes for each tercile (0 = ps not better than clim, 1 = ps > clim) 
+      
+  wilcox_df <- array(0, dim=c(ngrids, ndimT,2,event)) 
+  
+  for (i in 1:ngrids)  { 
+  for (t in 1:ndimT)  { 
+    
+  wht <- wilcox.test(x = score_clim[i,t,1,], y = score_ps[i,t,1,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
+  wlt <- wilcox.test(x = score_clim[i,t,2,], y = score_ps[i,t,2,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
+  
+    if (wht$p.value < 0.05) {
+      wilcox_df[i,t,2,1] <- 1 
+    }
+    if (wlt$p.value < 0.05) {
+      wilcox_df[i,t,2,2] <- 1 
+    }
+  }
+  }
+    # summarizing scores over bootstrapped samples
+  
+  wilcox_df[,,1,1] <- apply(score_ps[,,,1], c(1,2), mean, na.rm = TRUE)
+  wilcox_df[,,1,2] <- apply(score_ps[,,,2], c(1,2), mean, na.rm = TRUE)
+  
+  nom <- paste0(indic[ind],"_skills.RData")
+  save(wilcox_df, file = file.path(dir_data, "score", nom))
+
 }
 
 ```
@@ -53,36 +82,10 @@ We summarize in another array
 ```{r pressure, echo=FALSE}
 
      # visual assessment of normality - computed per grid
-par(mfrow=c(1,2))
-hist(score_ps[point,],freq=F)
-qqnorm(score_ps[point,])
-qqline(score_ps[point,]) #bug
-
-    # Wilcoxon test 
-    #
-wilcox_df <- array(0, dim=c(ngrids, ndimT,2,event)) 
-
-for (i in 1:ngrids)  { 
-for (t in 1:ndimT)  { 
-  
-wht <- wilcox.test(x = score_clim[i,t,1,], y = score_ps[i,t,1,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
-wlt <- wilcox.test(x = score_clim[i,t,2,], y = score_ps[i,t,2,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
-
-  if (wht$p.value < 0.05) {
-    wilcox_df[i,t,2,1] <- 1 
-  }
-  if (wlt$p.value < 0.05) {
-    wilcox_df[i,t,2,2] <- 1 
-  }
-}
-}
-  # summarize score over bootstrapped samples
-
-wilcox_df[,,1,1] <- apply(score_ps[,,,1], c(1,2), mean, na.rm = TRUE)
-wilcox_df[,,1,2] <- apply(score_ps[,,,2], c(1,2), mean, na.rm = TRUE)
-
-nom <- paste0(indic[ind],"_skills.RData")
-save(wilcox_df, file = file.path(dir_data, "score", nom))
+# par(mfrow=c(1,2))
+# hist(score_ps[point,],freq=F)
+# qqnorm(score_ps[point,])
+# qqline(score_ps[point,]) #bug
 
 ```
 
