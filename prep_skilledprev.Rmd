@@ -18,7 +18,7 @@ event <-2
 We save in one array skill scores over all bootstrapped samples, one for higher and one for lower tercile, and their associated Wilcoxon test outcomes. The test evaluates whether the prevision predicts better than the climatology, at 0.95 confidence level. 
 
 ```{r}
-for (ind in 1:2){
+for (ind in 1:8){
 
   score_ps <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
   score_clim <- array(NA, dim=c(ngrids, ndimT, event, 10)) 

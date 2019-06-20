@@ -116,7 +116,7 @@ ramp = colorRampPalette(c("lightblue", "red"))
 relief_shp <- st_read(dsn=file.path(dir_data, "communes-20190101.shp")) #  to be replaces by rivers etc...?????
 riviere_shp <- st_read(dsn=file.path(dir_data, "relief_naturel.shp")) #  to be replaces by rivers etc...?????
 
-prev_map <- tm_shape(ras_prev_complete$indicator)+
+prev_map <- tm_shape(ras_prev_complete$tercile)+
   tm_raster( title = titre_prev, palette = '-RdBu',
              legend.reverse = TRUE)+
   tm_legend(outside=TRUE, hist.width=2)+

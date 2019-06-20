@@ -17,6 +17,8 @@ library(rgdal)
 library(tmap)
 library(sf)
 library(ggmap)
+library(mapview)
+library(grid)
 ```
 ## Parameter specifications
 
@@ -25,52 +27,97 @@ Month
 Region of interest
 
 ```{r}
-select_var <- 2
-select_t <- 3
-select_y <- 2
+ind <- 1
+select_year <- 1993
 moi <- c("May","June","July","August","September","October","November")
+annees <- c(1993:2002)
+
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
 ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy days","Number of days T max > 25°C", 
              "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
-```
-## Loading shapefiles
 
-Using tmap package
+```
+## Loading raster
+
+Specific to indicator and year of prevision
 
 ```{r}
-titre_terc <- paste0(indic[select_var], "_likelytercile_", moi[select_t],an[select_y],".shp")
-titre_wil <- paste0(indic[select_var], "_wilcox_", moi[select_t],an[select_y],".shp")
+load(file = file.path(dir_plot, "season", "layname.RData")) # loading stack layer names before writeraster changed them
 
-shp_tercile <- readOGR(dsn=file.path(dir_plot, "season", titre_terc))
-shp_wilcox <- readOGR(dsn=file.path(dir_plot, "season", titre_wil))
+title <- paste0(indic[ind],"_prevskill", select_year,".tif")
+stacky <- stack(file.path(dir_plot, "season", title)) # loading stack file
 
+names(stacky) <- c(layername)# re setting original layer names
 ```
 ## Creating maps displaying prevision and skill shapefiles
 
-Using tmap package
+We create one shapefile per month from each raster layer extraction
 
 ```{r}
-shp_wilcox$wilcoxon[which(shp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
-titre <- paste0(ind_eng[select_var], " prevision for ", moi[select_t], " ", an[select_y])
- 
-### STATIC MAP
-tmap_mode('plot') # Rtools package not available for current R version, preventing basemap to be added (read_osm function)
 
-qtm(shp_tercile, fill = "tercile", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", 
+## CREATING SHAPEFILE TO BE PLOTTED BY EXTRACTING RASTER LAYER + FACET DISPLAYING 
+shp_tercile <- list()
+shp_wilcox <- list()
+maprev <- list()
+grid.newpage()
+page.layout <- grid.layout(nrow = 1, ncol = 6)
+pushViewport(viewport(layout = page.layout))
+
+for (t in 1:ndimT){
+ 
+  ### we build the shapefile of most likely tercile 
+  sp_tercile <- rasterToPolygons(stacky[[2+3*(t-1)]]) 
+  names(sp_tercile) <- "tercile"
+  shp_tercile[[t]] <- st_as_sf(sp_tercile)
+  #plot(shp_tercile)
+  # titre_terc <- paste0(indic[select_var], "_likelytercile_", moi[select_t],an[select_y],".shp")
+  # st_write(shp_tercile, titre_terc, delete_dsn=TRUE)
+  
+  ### we build the shapefile of most likely tercile 
+  sp_wilcox <- rasterToPolygons(stacky[[3+3*(t-1)]])
+  names(sp_wilcox) <- "wilcoxon"
+  sp_wilcox$wilcoxon[which(shp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+  shp_wilcox[[t]] <- st_as_sf(sp_wilcox)
+  #shp_wilcox$wilcoxon[which(shp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+  #plot(shp_wilcox)
+  # titre_wil <- paste0(indic[select_var], "_wilcox_", moi[select_t],an[select_y],".shp")
+  # st_write(shp_wilcox, titre_wil, delete_dsn=TRUE)
+  
+  ### mapping
+  titre <- paste0(ind_eng[ind]," ","for"," ", moi[t], " ", select_year)
+  maprev [[t]]<-qtm(shp_tercile[[t]], fill = "tercile", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", 
     attr.outside = TRUE, legend.title.size = 0.8, fill.palette = "Blues",
     legend.text.size = 0.5, title = titre, title.position = c("left","bottom"), fill.style="fixed",fill.breaks=c(1,2,3),
     borders = NULL, fill.alpha = 0.5)+
-tm_shape(shp_wilcox)+
+tm_shape(shp_wilcox[[t]])+
   tm_symbols(size ="wilcoxon", col = "red", legend.size.show = FALSE)+
-tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = FALSE, alpha = 0, labels.rot = c(0,90))+
+tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+tm_scale_bar()+
+  tm_legend()
+  
+  print(maprev[[t]], vp=viewport(layout.pos.row = 1, layout.pos.col = t))
+
+}
+
+
+### STATIC MAPPING
+tmap_mode('plot') # Rtools package not available for current R version, preventing basemap to be added (read_osm function)
+
+map1<-qtm(shp_tercile[[t]], fill = "tercile", style = "beaver", legend.outside=TRUE, legend.outside.position = "bottom", 
+    attr.outside = TRUE, legend.title.size = 0.8, fill.palette = "Blues",
+    legend.text.size = 0.5, title = titre, title.position = c("left","bottom"), fill.style="fixed",fill.breaks=c(1,2,3),
+    borders = NULL, fill.alpha = 0.5)+
+tm_shape(shp_wilcox[[t]])+
+  tm_symbols(size ="wilcoxon", col = "red", legend.size.show = FALSE)+
+tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
 tm_scale_bar()+
   tm_legend()
 
-### INTERACTIVE MAP
+### INTERACTIVE MAPPING
 tmap_mode('view')
 
-  qtm(shp_tercile, fill = "tercile",
+  map2 <- qtm(shp_tercile, fill = "tercile",
                  fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = "Blues", borders = NULL, fill.alpha=0.5, 
       fill.legend.show = FALSE, title = titre, main.title.position = c(""))+  
   tm_shape(shp_tercile)+
@@ -80,14 +127,20 @@ tmap_mode('view')
   tm_scale_bar()+
   tm_add_legend(type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))
 
-### ANIMATED MAP
+### ANIMATED MAPPING
 
-aniam <- tm_shape(shp_tercile) + 
+aniam <- tm_shape(shp_skilprev) + 
 	      tm_fill(col ="tercile", alpha=0.5, palette = "Blues", legend.show = FALSE)+
-	  tm_facets(along = "name")
+	  tm_facets(along = "month")
 
 tmap_animation(m1, filename="Dutch_provinces.gif", width=800, delay=40)
 
 tm_symbols()
-  
+
+# trials
+
+
+print(map[[1]], vp=viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(map[[2]], vp=viewport(layout.pos.row = 1, layout.pos.col = 2))
+
 ```
