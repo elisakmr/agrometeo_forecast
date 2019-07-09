@@ -41,8 +41,8 @@ Aggregation computed using latitude weighting
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:10, .export = 'score_boite_prob') %dopar%  { # loop on bootstrap samples
-  for (ind in 1:2){
+foreach(b=1:1000, .export = 'score_boite_prob') %dopar%  { # loop on bootstrap samples
+  for (ind in 1:8){
 
   nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
   nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
@@ -87,9 +87,9 @@ Scores computed for each grid separately
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:10, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
+foreach(b=1:1000, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
 
-  for (ind in 1:2){
+  for (ind in 1:8){
 
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
   nom_prev <- paste0(indic[ind],b,"_prev.RData")
@@ -111,7 +111,6 @@ foreach(b=1:10, .packages = 'easyVerification') %dopar%  { # loop on bootstrap s
   scoreprob_clim <- array (NA, dim=c(ngrids,ndimT,e))
   
   for (t in 1:ndimT){
-    for (i in 1:ngrids){
     # PREVISION
  
     # scoreprob_ps[i,t,1] <- roc.area(bin_ref[i,,t,1], prob_ps[i,,t,1])$A
@@ -120,7 +119,7 @@ foreach(b=1:10, .packages = 'easyVerification') %dopar%  { # loop on bootstrap s
     # scoreprob_ps[i,t,4] <- roc.area(bin_ref[i,,t,4], prob_ps[i,,t,4])$A
     # 
      #EnsRoca(prob_ps[,,t,3], bin_ref[,,t,3])
-     scoreprob_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat3 
+     scoreprob_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat3 
      scoreprob_ps[,t,2] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat1 
      scoreprob_ps[,t,3] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat5 
      scoreprob_ps[,t,4] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat1 
@@ -131,7 +130,7 @@ foreach(b=1:10, .packages = 'easyVerification') %dopar%  { # loop on bootstrap s
      scoreprob_clim[,t,3] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat5 
      scoreprob_clim[,t,4] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat1 
      # 
-    }
+    
   }
   nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
   nom_clim <- paste0(indic[ind], b,"scoreprob_grid_clim.RData")

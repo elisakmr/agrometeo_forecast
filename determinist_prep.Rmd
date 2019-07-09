@@ -28,9 +28,9 @@ N.B.: 831.22 sec elapsed
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:10, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
+foreach(b=1:1000, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
 
-for (ind in 1:2){
+for (ind in 1:8){
   
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
   nom_prev <- paste0(indic[ind],b,"_prev.RData")

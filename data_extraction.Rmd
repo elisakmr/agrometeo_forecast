@@ -20,9 +20,14 @@ no_core <- 5
 ## Loading data aggregated in csv file
 
 This section gathers parameters to be specified beforehand.
+Binding the csv's
 
 ```{r data loading, echo=FALSE}
-raw_data <- read.csv(file = file.path(dir_data, "Indicators_FR8_SEASON_test_1993_2002_v2.csv"), header = TRUE, sep = ",")
+raw_data1 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_1993_1998.csv"), header = TRUE, sep = ",")
+raw_data2 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_1999_2004.csv"), header = TRUE, sep = ",")
+raw_data3 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_2005_2009.csv"), header = TRUE, sep = ",")
+raw_data4 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_2010_2016.csv"), header = TRUE, sep = ",")
+raw_data <- rbind(raw_data1,raw_data2,raw_data3,raw_data4)
 ```
 
 ## Extracting parameters from csv to be used further
@@ -73,9 +78,9 @@ cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
 
-foreach(b=1:10, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
+foreach(b=1:1000, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
   
-  for (ind in 1:2){
+  for (ind in 1:8){
   
   # indicator type filtering
     indic_data <- raw_data %>% 

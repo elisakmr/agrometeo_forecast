@@ -18,15 +18,15 @@ event <-2
 We save in one array skill scores over all bootstrapped samples, one for higher and one for lower tercile, and their associated Wilcoxon test outcomes. The test evaluates whether the prevision predicts better than the climatology, at 0.95 confidence level. 
 
 ```{r}
-for (ind in 1:8){
+for (ind in 6:8){
 
-  score_ps <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
-  score_clim <- array(NA, dim=c(ngrids, ndimT, event, 10)) 
-  prev_prob <- array(NA, dim=c(ngrids, nan, ndimT, event, 10)) 
+  score_ps <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
+  score_clim <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
+  prev_prob <- array(NA, dim=c(ngrids, nan, ndimT, event, 1000)) 
   
       # loading scores (to be summarized later)
   
-  for (b in 1:10)  { 
+  for (b in 1:1000)  { 
   
     for (e in 1:2){
   
@@ -55,6 +55,7 @@ for (ind in 1:8){
     if (wht$p.value < 0.05) {
       wilcox_df[i,t,2,1] <- 1 
     }
+
     if (wlt$p.value < 0.05) {
       wilcox_df[i,t,2,2] <- 1 
     }
@@ -62,8 +63,8 @@ for (ind in 1:8){
   }
     # summarizing scores over bootstrapped samples
   
-  wilcox_df[,,1,1] <- apply(score_ps[,,,1], c(1,2), mean, na.rm = TRUE)
-  wilcox_df[,,1,2] <- apply(score_ps[,,,2], c(1,2), mean, na.rm = TRUE)
+  wilcox_df[,,1,1] <- apply(score_ps[,,1,], c(1,2), mean, na.rm = TRUE)
+  wilcox_df[,,1,2] <- apply(score_ps[,,2,], c(1,2), mean, na.rm = TRUE)
   
   nom <- paste0(indic[ind],"_skills.RData")
   save(wilcox_df, file = file.path(dir_data, "score", nom))
