@@ -18,7 +18,7 @@ event <-2
 We save in one array skill scores over all bootstrapped samples, one for higher and one for lower tercile, and their associated Wilcoxon test outcomes. The test evaluates whether the prevision predicts better than the climatology, at 0.95 confidence level. 
 
 ```{r}
-for (ind in 6:8){
+for (ind in 1:3){
 
   score_ps <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
   score_clim <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
@@ -49,8 +49,8 @@ for (ind in 6:8){
   for (i in 1:ngrids)  { 
   for (t in 1:ndimT)  { 
     
-  wht <- wilcox.test(x = score_clim[i,t,1,], y = score_ps[i,t,1,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
-  wlt <- wilcox.test(x = score_clim[i,t,2,], y = score_ps[i,t,2,] ,alternative = "less", paired = TRUE, conf.level = 0.95, na.rm = TRUE)
+  wht <- wilcox.test(x = score_clim[i,t,1,], y = score_ps[i,t,1,] ,alternative = "less", paired = TRUE, conf.level = 0.95)
+  wlt <- wilcox.test(x = score_clim[i,t,2,], y = score_ps[i,t,2,] ,alternative = "less", paired = TRUE, conf.level = 0.95)
   
     if (wht$p.value < 0.05) {
       wilcox_df[i,t,2,1] <- 1 

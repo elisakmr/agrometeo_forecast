@@ -119,13 +119,13 @@ foreach(b=1:1000, .packages = 'easyVerification') %dopar%  { # loop on bootstrap
     # scoreprob_ps[i,t,4] <- roc.area(bin_ref[i,,t,4], prob_ps[i,,t,4])$A
     # 
      #EnsRoca(prob_ps[,,t,3], bin_ref[,,t,3])
-     scoreprob_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3)$cat3 
+     scoreprob_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[55,,,3], obs=array_obs[55,,3], prob=1:2/3, na.rm = TRUE)$cat3 
      scoreprob_ps[,t,2] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat1 
      scoreprob_ps[,t,3] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat5 
      scoreprob_ps[,t,4] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat1 
     #veriApply("EnsRoca", fcst=array_prev[19,,,t], obs=array_obs[19,,t], prob=1:4/5, parallel = TRUE)$cat5
       # CLIMATO
-     scoreprob_clim[,t,1] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat3 
+     scoreprob_clim[,t,1] <- veriApply("EnsRoca", fcst=array_clim[55,,,3], obs=array_obs[55,,3], prob=1:2/3, parallel = TRUE)$cat3 
      scoreprob_clim[,t,2] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat1 
      scoreprob_clim[,t,3] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat5 
      scoreprob_clim[,t,4] <- veriApply("EnsRoca", fcst=array_clim[,,,t], obs=array_obs[,,t], prob=1:4/5, parallel = TRUE)$cat1 

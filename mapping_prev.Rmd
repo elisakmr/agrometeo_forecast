@@ -28,9 +28,10 @@ Region of interest
 
 ```{r}
 #ind <- 2
-select_year <- 2003
+select_year <- 1995
 moi <- c("May","June","July","August","September","October","November")
 annees <- c(1993:2016)
+ind <- 2
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -43,10 +44,10 @@ ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy day
 Specific to indicator and year of prevision
 
 ```{r}
-load(file = file.path(dir_plot, "season", "layname.RData")) # loading stack layer names before writeraster changed them
+load(file = file.path(dir_plot, "season_raster", "layname.RData")) # loading stack layer names before writeraster changed them
 
 title <- paste0(indic[ind],"_prevskill", select_year,".tif")
-stacky <- stack(file.path(dir_plot, "season", title)) # loading stack file
+stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
 
 names(stacky) <- c(layername)# re setting original layer names
 ```
@@ -65,6 +66,7 @@ grid.newpage()
 page.layout <- grid.layout(nrow = 2, ncol = 3)
 pushViewport(viewport(layout = page.layout))
 
+
 for (m in 1:ndimT){
  
   ### we build the shapefile of most likely tercile 
@@ -78,17 +80,22 @@ for (m in 1:ndimT){
   sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
   shp_wilcox[[m]] <- st_as_sf(sp_wilcox)
   
+   
+#    
   ### mapping
   titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
-  maprev [[m]]<-qtm(shp_tercile[[m]], fill = "tercile", fill.legend.show = FALSE,
-    attr.outside = TRUE, fill.palette = c("darkslategray2","dodgerblue3"), title = titre, title.position = c("left","top"), fill.style="fixed",fill.breaks=c(1,2,3),borders = NULL)+
-tm_shape(shp_wilcox[[m]])+
-  tm_symbols(size ="wilcoxon", col = "black", legend.size.show = FALSE, scale = 0.01)+
-#tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
-tm_scale_bar()+
-tm_add_legend(type = "fill", labels = c("Upper tercile","Lower tercile"), col = c("dodgerblue3","darkslategray2"), alpha = 0.5)
-  
-  if (m<4){
+  maprev [[m]]<- tm_basemap(leaflet::providers$Esri.WorldTopoMap)+ 
+    qtm(shp_tercile[[m]], fill = "tercile", fill.legend.show = FALSE,
+     attr.outside = TRUE, fill.palette = c("darkslategray2","dodgerblue3"), fill.style="fixed",fill.breaks=c(1,2,3),borders = NULL)+
+ tm_shape(shp_wilcox[[m]])+
+   tm_symbols(size ="wilcoxon", col = "yellow", legend.size.show = FALSE, scale = 0.1)+
+ #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+ tm_scale_bar()+
+ tm_add_legend(type = "fill", labels = c("Upper tercile","Lower tercile"), col = c("dodgerblue3","darkslategray2"), alpha = 0.5)+
+     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5)
+    
+
+   if (m<4){
   print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
   }
   else {
@@ -96,6 +103,7 @@ tm_add_legend(type = "fill", labels = c("Upper tercile","Lower tercile"), col = 
   }
 
 }
+
 
 ```
 ## Interactive mapping
@@ -105,8 +113,8 @@ We display an interactive map for on specific month to be selected beforehand
 ```{r}
 
 ### Parameter setting
-t <- 3 # month of interest
-titrei <- paste0(ind_eng[ind]," ","for"," ", moi[t], " ", select_year)
+# t <- 3 # month of interest
+# titrei <- paste0(ind_eng[ind]," ","for"," ", moi[t], " ", select_year)
 
 ### INTERACTIVE MAPPING
 
@@ -122,25 +130,49 @@ titrei <- paste0(ind_eng[ind]," ","for"," ", moi[t], " ", select_year)
   shp_wilcox <- st_as_sf(sp_wilcox)
 
 tmap_mode('view')
+#, title = titrei, main.title.position = c("")
 
-  map2 <- qtm(shp_tercile, fill = "tercile",
-                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = c("darkslategray2", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE, title = titrei, main.title.position = c(""))+  
-  tm_shape(shp_tercile)+
-  tm_fill(col ="tercile", alpha=0.6, palette = c("darkslategray2", "dodgerblue3"), legend.show = FALSE)+
-     tm_shape(shp_wilcox)+
-        tm_symbols(size ="wilcoxon", col = "red", alpha=1, scale = 0.3)+
-  tm_scale_bar()+
-  tm_add_legend(type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))
+  # map2 <- qtm(shp_tercile, fill = "tercile",
+  #                fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = c("darkslategray2", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE)+  
+  # tm_shape(shp_tercile)+
+  # tm_fill(col ="tercile", alpha=0.6, palette = c("darkslategray2", "dodgerblue3"), legend.show = FALSE)+
+  #    tm_shape(shp_wilcox)+
+  #       tm_symbols(size ="wilcoxon", col = "red", alpha=1, scale = 0.3)+
+  # tm_scale_bar()+
+  # tm_add_legend(type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))+
+  #    tm_layout(title = titrei, title.position = c("left","bottom"), title.size = 0.5)
 
-  ## TESTING
+  ## TESTING ################
+shp_tercile <- list()
+shp_wilcox <- list()
+maprev <- list()
+for (m in 1:ndimT){
+ 
+  ### we build the shapefile of most likely tercile 
+  sp_tercile <- rasterToPolygons(stacky[[2+3*(m-1)]]) 
+  names(sp_tercile) <- "tercile"
+  shp_tercile[[m]] <- st_as_sf(sp_tercile)
+
+  ### we build the shapefile of most likely tercile 
+  sp_wilcox <- rasterToPolygons(stacky[[3+3*(m-1)]])
+  names(sp_wilcox) <- "wilcoxon"
+  sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+  shp_wilcox[[m]] <- st_as_sf(sp_wilcox)
   
-  qtm(shp_tercile[[m]], fill = "tercile",
-                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = c("darkslategray2", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE, title = titre, main.title.position = c(""))+  
+  ### mapping
+  titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
+
+  maprev[[m]] <- qtm(shp_tercile[[m]], fill = "tercile",
+                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = c("darkslategray2", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE)+  
   tm_shape(shp_tercile[[m]])+
   tm_fill(col ="tercile", alpha=0.6, palette = c("darkslategray2", "dodgerblue3"), legend.show = FALSE)+
      tm_shape(shp_wilcox[[m]])+
         tm_symbols(size ="wilcoxon", col = "red", alpha=1, scale = 0.3)+
   tm_scale_bar()+
-  tm_add_legend(type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))
+  tm_add_legend(title = titre, type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))
 
+}
+tmap_options(limits = c(facets.view = 6))
+tmap_arrange(maprev[[1]],maprev[[2]],maprev[[3]],maprev[[4]],maprev[[5]],maprev[[6]])
+ 
 ```

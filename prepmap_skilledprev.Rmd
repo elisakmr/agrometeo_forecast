@@ -111,11 +111,11 @@ for (ind in 6:8){
   
   stacky <- stack(ras_prev_complete)
   title <- paste0(indic[ind],"_prevskill", annees[y],".tif")
-  writeRaster(stacky, filename=file.path(dir_plot, "season", title), overwrite = TRUE)
+  writeRaster(stacky, filename=file.path(dir_plot, "season_raster", title), overwrite = TRUE)
   }
 }
 layername <- names(stacky)
-save(layername, file = file.path(dir_plot, "season", "layname.RData"))
+save(layername, file = file.path(dir_plot, "season_raster", "layname.RData"))
 ```
 
 
