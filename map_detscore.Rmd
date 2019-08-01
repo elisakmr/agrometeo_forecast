@@ -1,0 +1,100 @@
+---
+title: "Mapping deterministic scores"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+library(mapview)
+library(grid)
+```
+## Parameter specifications
+
+Indicator to be displayed
+Region of interest
+
+```{r}
+moi <- c("May","June","July","August","September","October","November")
+ind <- 1
+
+ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
+             "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
+ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy days","Number of days T max > 25°C", 
+             "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
+
+```
+## Loading raster
+
+Specific to indicator and year of prevision
+
+```{r}
+load(file = file.path(dir_plot, "season_raster", "det_layname.RData")) # loading stack layer names before writeraster changed them
+
+title <- paste0(indic[ind],"_detsign.tif")
+stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+
+names(stacky) <- c(layername)# re setting original layer names
+```
+## Creating maps displaying prevision and skill shapefiles
+
+We create one shapefile per month from each raster layer extraction
+
+```{r}
+
+## CREATING SHAPEFILE TO BE PLOTTED BY EXTRACTING RASTER LAYER + FACET DISPLAYING 
+tmap_mode('plot')
+shp_sign <- list()
+shp_score <- list()
+maprev <- list()
+grid.newpage()
+page.layout <- grid.layout(nrow = 2, ncol = 3)
+pushViewport(viewport(layout = page.layout))
+
+
+for (m in 1:ndimT){
+ 
+  ### we build the shapefile of most likely tercile 
+  sp_score <- rasterToPolygons(stacky[[2+3*(m-1)]]) 
+  names(sp_score) <- "score"
+  shp_score[[m]] <- st_as_sf(sp_score)
+
+  ### we build the shapefile of most likely tercile 
+  sp_sign <- rasterToPolygons(stacky[[3+3*(m-1)]])
+  names(sp_sign) <- "significance"
+  sp_sign$significance[which(sp_sign$significance==0)] <- NA # to help plotting
+  shp_sign[[m]] <- st_as_sf(sp_sign)
+
+  ### mapping
+  titre <- paste0(ind_eng[ind]," ","score on"," ", moi[m])
+  maprev [[m]]<- tm_basemap(leaflet::providers$Esri.WorldTopoMap)+ 
+    qtm(shp_score[[m]], fill = "score", fill.legend.show = TRUE,
+     attr.outside = TRUE,borders = NULL, fill.palette = "YlOrRd")+ 
+ tm_shape(shp_sign[[m]])+
+   tm_symbols(size ="significance", col = "yellow", legend.size.show = FALSE, scale = 0.1)+
+ #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+ tm_scale_bar()+
+     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5)
+
+   if (m<4){
+  print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
+  }
+  else {
+  print(maprev[[m]], vp=viewport(layout.pos.row = 2, layout.pos.col = m-3))
+  }
+
+}
+
+
+```

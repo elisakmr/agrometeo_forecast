@@ -28,7 +28,7 @@ Region of interest
 
 ```{r}
 #ind <- 2
-select_year <- 1995
+select_year <- 2005
 moi <- c("May","June","July","August","September","October","November")
 annees <- c(1993:2016)
 ind <- 2
@@ -78,20 +78,22 @@ for (m in 1:ndimT){
   sp_wilcox <- rasterToPolygons(stacky[[3+3*(m-1)]])
   names(sp_wilcox) <- "wilcoxon"
   sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+  sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==2)] <- NA # to help plotting only high confidence dots #  TO BE CHANGEDDDD
   shp_wilcox[[m]] <- st_as_sf(sp_wilcox)
   
    
-#    
+#    1st tercile = lower tercile
+  #
   ### mapping
   titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
   maprev [[m]]<- tm_basemap(leaflet::providers$Esri.WorldTopoMap)+ 
     qtm(shp_tercile[[m]], fill = "tercile", fill.legend.show = FALSE,
-     attr.outside = TRUE, fill.palette = c("darkslategray2","dodgerblue3"), fill.style="fixed",fill.breaks=c(1,2,3),borders = NULL)+
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4), fill.palette = c("darkslategray2","lightgrey","dodgerblue3"))+ 
  tm_shape(shp_wilcox[[m]])+
    tm_symbols(size ="wilcoxon", col = "yellow", legend.size.show = FALSE, scale = 0.1)+
  #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
  tm_scale_bar()+
- tm_add_legend(type = "fill", labels = c("Upper tercile","Lower tercile"), col = c("dodgerblue3","darkslategray2"), alpha = 0.5)+
+ tm_add_legend(type = "fill", labels = c("3rd tercile","2nd tercile","1st tercile"), col =  c("dodgerblue3","lightgrey","darkslategray2"), alpha = 0.5)+
      tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5)
     
 
@@ -108,30 +110,28 @@ for (m in 1:ndimT){
 ```
 ## Interactive mapping
 
-We display an interactive map for on specific month to be selected beforehand
 
 ```{r}
+tmap_mode('view')
 
-### Parameter setting
-# t <- 3 # month of interest
-# titrei <- paste0(ind_eng[ind]," ","for"," ", moi[t], " ", select_year)
-
-### INTERACTIVE MAPPING
+############# SINGLE MAP ##################
 
 ### we build the shapefile of most likely tercile 
-  sp_tercile <- rasterToPolygons(stacky[[2+3*(t-1)]]) 
-  names(sp_tercile) <- "tercile"
-  shp_tercile <- st_as_sf(sp_tercile)
+#   sp_tercile <- rasterToPolygons(stacky[[2+3*(t-1)]]) 
+#   names(sp_tercile) <- "tercile"
+#   shp_tercile <- st_as_sf(sp_tercile)
+# 
+#   ### we build the shapefile of most likely tercile 
+#   sp_wilcox <- rasterToPolygons(stacky[[3+3*(t-1)]])
+#   names(sp_wilcox) <- "wilcoxon"
+#   sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+#   shp_wilcox <- st_as_sf(sp_wilcox)
+# 
+# 
 
-  ### we build the shapefile of most likely tercile 
-  sp_wilcox <- rasterToPolygons(stacky[[3+3*(t-1)]])
-  names(sp_wilcox) <- "wilcoxon"
-  sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
-  shp_wilcox <- st_as_sf(sp_wilcox)
-
-tmap_mode('view')
-#, title = titrei, main.title.position = c("")
-
+ 
+  
+  # title = titrei, main.title.position = c("")
   # map2 <- qtm(shp_tercile, fill = "tercile",
   #                fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = c("darkslategray2", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE)+  
   # tm_shape(shp_tercile)+
@@ -142,7 +142,9 @@ tmap_mode('view')
   # tm_add_legend(type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))+
   #    tm_layout(title = titrei, title.position = c("left","bottom"), title.size = 0.5)
 
-  ## TESTING ################
+
+  ############# MULTI MAPS ##################
+
 shp_tercile <- list()
 shp_wilcox <- list()
 maprev <- list()
@@ -157,19 +159,20 @@ for (m in 1:ndimT){
   sp_wilcox <- rasterToPolygons(stacky[[3+3*(m-1)]])
   names(sp_wilcox) <- "wilcoxon"
   sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==0)] <- NA # to help plotting only high confidence dots
+  sp_wilcox$wilcoxon[which(sp_wilcox$wilcoxon==2)] <- NA # to help plotting only high confidence dots
   shp_wilcox[[m]] <- st_as_sf(sp_wilcox)
   
   ### mapping
   titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
-
-  maprev[[m]] <- qtm(shp_tercile[[m]], fill = "tercile",
-                 fill.style="fixed",fill.breaks=c(1,2,3), fill.palette = c("darkslategray2", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE)+  
-  tm_shape(shp_tercile[[m]])+
-  tm_fill(col ="tercile", alpha=0.6, palette = c("darkslategray2", "dodgerblue3"), legend.show = FALSE)+
+#
+  maprev[[m]] <- qtm(shp_tercile[[m]], fill = "tercile",fill.style="fixed",fill.breaks=c(1,2,3,4),
+                  fill.palette = c("darkslategray2","yellow", "dodgerblue3"), borders = NULL, fill.alpha=0, fill.legend.show = FALSE)+  
+  tm_shape(shp_tercile[[m]],fill.style="fixed",fill.breaks=c(1,2,3,4))+
+  tm_fill(col ="tercile", alpha=0.6, palette = c("darkslategray2","lightgrey", "dodgerblue3"), legend.show = FALSE)+
      tm_shape(shp_wilcox[[m]])+
         tm_symbols(size ="wilcoxon", col = "red", alpha=1, scale = 0.3)+
   tm_scale_bar()+
-  tm_add_legend(title = titre, type = "fill", labels = c("Upper tercile", "Lower tercile"), col = c("dodgerblue3","darkslategray2"))
+  tm_add_legend(title = titre, type = "fill", labels = c("3rd tercile","2nd tercile","1st tercile"), col = c("dodgerblue3","lightgrey","darkslategray2"))
 
 }
 tmap_options(limits = c(facets.view = 6))

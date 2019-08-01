@@ -10,7 +10,7 @@ dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2"
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
 
 no_core <- 5
-event <-2
+event <-3
 ```
 
 ## Combining prevision and skills
@@ -18,53 +18,56 @@ event <-2
 We save in one array skill scores over all bootstrapped samples, one for higher and one for lower tercile, and their associated Wilcoxon test outcomes. The test evaluates whether the prevision predicts better than the climatology, at 0.95 confidence level. 
 
 ```{r}
-for (ind in 1:3){
+for (ind in 1:2){
 
-  score_ps <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
-  score_clim <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
-  prev_prob <- array(NA, dim=c(ngrids, nan, ndimT, event, 1000)) 
+  score_ps <- array(NA, dim=c(ngrids, ndimT, event, 100)) 
+  prev_prob <- array(NA, dim=c(ngrids, nan, ndimT, event, 100)) 
   
       # loading scores (to be summarized later)
   
-  for (b in 1:1000)  { 
+  for (b in 1:100)  { 
   
     for (e in 1:2){
   
     nom_prev <- paste0(indic[ind], b,"scoreprob_grid_prev.RData")
-    nom_clim <- paste0(indic[ind], b,"scoreprob_grid_clim.RData")
     load(file = file.path(dir_data, "score", nom_prev))
-    load(file = file.path(dir_data, "score", nom_clim))
-    
+
     score_ps[,,e,b] <- scoreprob_ps[,,e]
-    score_clim[,,e,b] <- scoreprob_clim[,,e]
-    
+
     prev_prob[,,,e,b] <- prob_ps[,,,e]
     
     }
   }
-      # extracting Wilcoxon test outcomes for each tercile (0 = ps not better than clim, 1 = ps > clim) 
+      # extracting Wilcoxon test outcomes for each tercile (0 = not significant, 1 = significant) 
       
   wilcox_df <- array(0, dim=c(ngrids, ndimT,2,event)) 
   
   for (i in 1:ngrids)  { 
   for (t in 1:ndimT)  { 
     
-  wht <- wilcox.test(x = score_clim[i,t,1,], y = score_ps[i,t,1,] ,alternative = "less", paired = TRUE, conf.level = 0.95)
-  wlt <- wilcox.test(x = score_clim[i,t,2,], y = score_ps[i,t,2,] ,alternative = "less", paired = TRUE, conf.level = 0.95)
+  wht <- wilcox.test(score_ps[i,t,1,], conf.level = 0.95)
+  wmt <- wilcox.test(score_ps[i,t,2,], conf.level = 0.95)
+  wlt <- wilcox.test(score_ps[i,t,3,], conf.level = 0.95)
   
     if (wht$p.value < 0.05) {
       wilcox_df[i,t,2,1] <- 1 
     }
 
-    if (wlt$p.value < 0.05) {
+    if (wmt$p.value < 0.05) {
       wilcox_df[i,t,2,2] <- 1 
     }
+  
+    if (wlt$p.value < 0.05) {
+      wilcox_df[i,t,2,3] <- 1 
+    }
+  
   }
   }
     # summarizing scores over bootstrapped samples
   
   wilcox_df[,,1,1] <- apply(score_ps[,,1,], c(1,2), mean, na.rm = TRUE)
   wilcox_df[,,1,2] <- apply(score_ps[,,2,], c(1,2), mean, na.rm = TRUE)
+  wilcox_df[,,1,3] <- apply(score_ps[,,3,], c(1,2), mean, na.rm = TRUE)
   
   nom <- paste0(indic[ind],"_skills.RData")
   save(wilcox_df, file = file.path(dir_data, "score", nom))
