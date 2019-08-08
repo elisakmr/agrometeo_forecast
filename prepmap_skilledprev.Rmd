@@ -72,7 +72,9 @@ for (ind in 1:3){
 
     ras_prev_complete <- list()
     for (t in 1:ndimT){
-      matrix4shp <- matrix(2, nrow = ngrids, ncol = 4)
+      
+      matrix4shp <- matrix(2, nrow = ngrids, ncol = 4) 
+      
       for (i in 1:ngrids) {
         if (prob_ps[i,y_index[1],t,1] > 0.5){ # i.e. upper tercile more likely to happen
         matrix4shp[i,1] <- 3
