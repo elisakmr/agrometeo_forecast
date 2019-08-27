@@ -18,7 +18,6 @@ library(iterators)
 library(parallel)
 library(doParallel)
 no_core <- 5
-e <- 4 # number of events : auc h/m/l tercile/quintile 
 
 ```
 
@@ -38,35 +37,64 @@ lati <- as.vector(vect_lat)
 Aggregation computed using latitude weighting
 
 ```{r}
-cl <- makeCluster(no_core)
-registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:1000, .export = 'score_boite_prob') %dopar%  { # loop on bootstrap samples
-  for (ind in 1:8){
 
-  nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
-  nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
- 
-  load(file = file.path(dir_data, "extract", nom_ref))
-  load(file = file.path(dir_data, "extract", nom_prev))
-  
-  scor_ps <- list()
+for (ind in 1:8){
+  scor_mont <- list()
   for (t in 1: ndimT){
-    int_ps <- list()
-    for (e in 1:4){ #prev_prob, obs_bin, lati, nb_bin, e
-      int_ps[[e]] <- score_boite_prob(prob_ps, bin_ref, t, lati[,1], nb_bin = 5, e)
+    list_event <- list()
+    for (e in 1:6){ #LT,MT,HT//LQ,MQ,HQ
+      vect_boot <- vector()
+      for(b in 1:1000){
+
+      nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
+      nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
+     
+      load(file = file.path(dir_data, "extract", nom_ref))
+      load(file = file.path(dir_data, "extract", nom_prev))
+    
+      vect_boot[[b]] <- score_boite_prob(prob_ps, bin_ref, t, lati[,1], nb_bin = 5, e)$AUC
+      }
       
+    list_event[[e]] <- vect_boot
     }
-    scor_ps[[t]] <- int_ps
+    
+  scor_mont[[t]] <- list_event
   }
-  nom_ps <- paste0(indic[ind], b,"probbox_ps.RData")
   
-  save(scor_ps, file = file.path(dir_data, "score", nom_ps))
-}
+  nom_ps <- paste0(indic[ind],"scorprob_box.RData")
+  save(scor_mont, file = file.path(dir_data, "score", nom_ps))
+
 }
 
-stopCluster(cl)
 tictoc::toc()
+
+```
+## Box-agregated score analysis
+
+Aggregation computed using latitude weighting
+
+```{r}
+
+for (ind in 1:8){
+  nom_ps <- paste0(indic[ind],"scorprob_box.RData")
+  load(file = file.path(dir_data, "score", nom_ps))
+
+  sum_df <- matrix(ncol = ndimT, nrow = 6)
+  
+  for (t in 1: ndimT){
+    for (e in 1:6){ #LT,MT,HT//LQ,MQ,HQ
+    sum_df[t,e] <- mean(scor_mont[[t]][[e]])
+
+    }
+  }
+  
+  nom_ps <- paste0(indic[ind],"scorprob_boxav.RData")
+  save(sum_df, file = file.path(dir_data, "score", nom_ps))
+}
+
+nom_ps <- paste0(indic[ind],"scorprob_boxav.RData")
+load(file = file.path(dir_data, "score", nom_ps))
 
 ```
 
@@ -116,4 +144,54 @@ stopCluster(cl)
 tictoc::toc()
 
 
+
 ```
+## Manual gridded scores
+
+For ancillary checking
+
+```{r}
+nom_probps <- paste0(indic[ind],b,"_prob_prev.RData")
+nom_obsbin <- paste0(indic[ind],b,"_bin_obs.RData")
+
+load(file = file.path(dir_data, "extract", nom_probps))
+load(file = file.path(dir_data, "extract", nom_obsbin))
+
+  O=numeric(nb_bin)          # occurences bien prevues (hits)
+  NO=numeric(nb_bin)         # fausses alertes
+  HR=numeric(nb_bin)         # taux de bonnes previs agreges (pour ROC)
+  FAR=numeric(nb_bin)        # taux de fausses alertes (pour ROC)
+  HR_rel=numeric(nb_bin)     # taux bonnes previs par bin (pour diag fiabilite)
+  F_rel=numeric(nb_bin)      # freq des previs pour chaque bin (pour diag fiabilite)
+
+for (bin in (1:nb_bin)) {
+    
+        vect_prev <- prob_ps[i,,t,e]
+        vect_obs <- bin_ref[i,,t,e]
+        O[bin] = O[bin] + length(which(vect_prev>=((bin-1)/nb_bin) 
+                                                           & vect_prev<(bin/nb_bin) & vect_obs==1))
+        NO[bin] = NO[bin] + length(which(vect_prev>=((bin-1)/nb_bin) 
+                                                             & vect_prev<(bin/nb_bin) & vect_obs==0))
+        
+}
+  
+for (bin in (1:nb_bin)) {
+    # pour courbe ROC
+    HR[bin] = sum(O[bin:nb_bin])/sum(O[])
+    FAR[bin] = sum(NO[bin:nb_bin])/sum(NO[])
+  }
+  # taux par bin (pour diag de fiabilite)
+  HR_rel=O/(O+NO)
+  F_rel=(O+NO)/sum(O[]+NO[])
+  
+  # calcul AUC (cf http://stackoverflow.com/questions/4954507/calculate-the-area-under-a-curve-in-r)
+  AUC=-sum(diff(FAR) * (head(HR,-1)+tail(HR,-1)))/2
+  
+  liste_score = list(HR=HR,FAR=FAR, HR=HR, FAR=FAR, AUC=AUC)
+
+```
+
+
+
+
+

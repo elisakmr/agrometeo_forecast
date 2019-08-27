@@ -27,7 +27,7 @@ Region of interest
 
 ```{r}
 moi <- c("May","June","July","August","September","October","November")
-ind <- 1
+ind <- 7
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -40,12 +40,12 @@ ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy day
 Specific to indicator and year of prevision
 
 ```{r}
-load(file = file.path(dir_plot, "season_raster", "prob_layname.RData")) # loading stack layer names before writeraster changed them
 
 title <- paste0(indic[ind],"_probsign.tif")
 stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
 
-names(stacky) <- c(layername)# re setting original layer names
+#load(file = file.path(dir_plot, "season_raster", "probquin_layname.RData")) # loading stack layer names before writeraster changed them
+#names(stacky) <- c(layername)# re setting original layer names
 ```
 ## Creating maps displaying prevision and skill shapefiles
 
@@ -59,7 +59,7 @@ htshp_score <- list()
 htshp_sign <- list()
 maprev <- list()
 grid.newpage()
-page.layout <- grid.layout(nrow = 2, ncol = 3)
+page.layout <- grid.layout(nrow = 3, ncol = 3)
 pushViewport(viewport(layout = page.layout))
 
 
@@ -67,7 +67,7 @@ for (m in 1:ndimT){
  
   ### we build the shapefiles of tercile scores
   ht_score <- rasterToPolygons(stacky[[4+5*(m-1)]]) 
-  names(ht_score) <- "highter_score"
+  names(ht_score) <- "ROC.High.Tercile"
   htshp_score[[m]] <- st_as_sf(ht_score)
 
   ### we build the shapefile of score statistical significance 
@@ -78,14 +78,13 @@ for (m in 1:ndimT){
 
   ### mapping
   titre <- paste0(ind_eng[ind]," ","score on"," ", moi[m])
-  maprev [[m]]<- tm_basemap(leaflet::providers$Esri.WorldTopoMap)+ 
-    qtm(htshp_score[[m]], fill = "highter_score", fill.legend.show = TRUE,
+  maprev [[m]]<- qtm(htshp_score[[m]], fill = "ROC.High.Tercile",
      attr.outside = TRUE,borders = NULL, fill.palette = "YlOrRd")+ 
  tm_shape(htshp_sign[[m]])+
-   tm_symbols(size ="highter_significance", col = "yellow", legend.size.show = FALSE, scale = 0.1)+
+   tm_symbols(size ="highter_significance", col = "yellow", scale = 0.1)+
  #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
- tm_scale_bar()+
-     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5)
+ #tm_scale_bar()+
+     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
 
    if (m<4){
   print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
@@ -95,6 +94,12 @@ for (m in 1:ndimT){
   }
 
 }
+
+com_legend <- qtm(htshp_score[[m]], fill = "ROC.High.Tercile", fill.style="cont", fill.breaks=c( 0.2, 0.4, 0.6, 0.8, 1),
+     attr.outside = TRUE,borders = NULL, fill.palette = "YlOrRd")+ 
+     tm_layout(legend.only = TRUE)
+
+print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 
 
 ```

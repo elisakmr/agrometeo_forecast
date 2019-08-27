@@ -27,10 +27,10 @@ Month
 Region of interest
 
 ```{r}
-select_year <- 2003
+select_year <- 2000
 moi <- c("May","June","July","August","September","October","November")
 annees <- c(1993:2016)
-ind <- 2
+ind <- 1
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -43,12 +43,10 @@ ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy day
 Specific to indicator and year of prevision
 
 ```{r}
-load(file = file.path(dir_plot, "season_raster", "layname.RData")) # loading stack layer names before writeraster changed them
 
 title <- paste0(indic[ind],"_confprev", select_year,".tif")
 stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
 
-names(stacky) <- c(layername)# re setting original layer names
 ```
 ## Creating maps displaying prevision and skill shapefiles
 
@@ -62,7 +60,7 @@ shp_tercile <- list()
 shp_conf <- list()
 maprev <- list()
 grid.newpage()
-page.layout <- grid.layout(nrow = 2, ncol = 3)
+page.layout <- grid.layout(nrow = 3, ncol = 3)
 pushViewport(viewport(layout = page.layout))
 
 
@@ -73,7 +71,7 @@ for (m in 1:ndimT){
   names(sp_tercile) <- "tercile"
   shp_tercile[[m]] <- st_as_sf(sp_tercile)
 
-  ### we build the shapefile of most likely tercile 
+  ### we build the shapefile of prevision confidence
   sp_conf <- rasterToPolygons(stacky[[3+3*(m-1)]])
   names(sp_conf) <- "confidence"
   sp_conf$confidence[which(sp_conf$confidence==0)] <- NA # to help plotting
@@ -84,15 +82,14 @@ for (m in 1:ndimT){
   
   ### mapping
   titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
-  maprev [[m]]<- tm_basemap(leaflet::providers$Esri.WorldTopoMap)+ 
-    qtm(shp_tercile[[m]], fill = "tercile", fill.legend.show = FALSE,
-     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4), fill.palette = c("darkslategray2","lightgrey","dodgerblue3"))+ 
+  maprev [[m]]<- qtm(shp_tercile[[m]], fill = "tercile",
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4), fill.palette = c("darkslategray2","lightgrey","dodgerblue3"), legend.fill.show=FALSE)+ 
  tm_shape(shp_conf[[m]])+
-   tm_symbols(size ="confidence", col = "yellow", legend.size.show = FALSE, scale = 0.1)+
+   tm_symbols(size ="confidence", col = "yellow", scale = 0.1)+
  #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
- tm_scale_bar()+
+ #tm_scale_bar()+
  tm_add_legend(type = "fill", labels = c("3rd tercile","2nd tercile","1st tercile"), col =  c("dodgerblue3","lightgrey","darkslategray2"), alpha = 0.5)+
-     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5)
+     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
 
    if (m<4){
   print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
@@ -102,6 +99,12 @@ for (m in 1:ndimT){
   }
 
 }
+
+com_legend <- qtm(shp_tercile[[m]], fill = "tercile",
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4), fill.palette = c("darkslategray2","lightgrey","dodgerblue3"))+  
+     tm_layout(legend.only = TRUE)
+
+print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 
 
 ```

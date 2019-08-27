@@ -82,7 +82,8 @@ for (ind in 1:3){
   # wrms <- wilcox.test(x = score_clim[i,t,3,], y = score_ps[i,t,3,] ,alternative = "greater", paired = TRUE, conf.level = 0.95)
  
     if (wacc$p.value < 0.05) {
-      matrix4shp[i,2] <- 1 
+      
+      [i,2] <- 1 
     }
   }
     

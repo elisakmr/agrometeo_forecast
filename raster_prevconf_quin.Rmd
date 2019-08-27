@@ -1,0 +1,112 @@
+---
+title: "raster_prevconf"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+library(nnet)
+
+```
+
+## Parameter setting 
+
+```{r}
+
+moi <- c("May","June","July","August","September","October","November")
+annees <- c(1993:2016)
+
+```
+## Building up rasters merging gridded prevision and confidence - indicator and year specific
+For each indicator:
+  - We create a conversion-to-raster-ready dataframe containing the most likely tercile and the confidence level (0: conf < 0.5; 1: conf > 0.5).
+  - We transform the data frame into a raster, specific to each month
+  - We stack all rasters in a rasterstack containing all month and save it
+
+```{r}
+
+for (ind in 6:8){
+  
+  for (y in 1:nan){
+    
+    #---------------------------------------------------------------------------------------------------------------------------------------------
+      ## we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
+      
+      # bootstrap iteration index of the year selected
+    load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+    
+    list_match <- lapply(rand_year, function(x) grep(y, x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+    
+    y_index <- list_match[[1]] # year index within the bootstrap iteration
+    b_index <- 1 # bootstrap iteration index
+    for (b in 1:999){ # pick the first iteration and first index matching the year we are looking for
+      if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+      else {y_index <- y_index; b_index <- b_index}
+    }
+    
+    #---------------------------------------------------------------------------------------------------------------------------------------------
+    ## loading dataframe of prevision with associated coordinates
+
+  nom_ps <- paste0(indic[ind],b_index,"_prob_prev.RData")
+  load(file = file.path(dir_data, "extract", nom_ps))
+  
+  load(file = file.path(dir_data, "extract", "lon.RData"))
+  load(file = file.path(dir_data, "extract", "lat.RData"))
+  
+  ## creating a table containing most likely tercile and its associated confidence level (regarding probability value), with both coordinates (shape ready for shapefile conversion)
+
+    ras_prev_complete <- list()
+    for (t in 1:ndimT){
+      matrix4shp <- matrix(0, nrow = ngrids, ncol = 4)
+      for (i in 1:ngrids) {
+        proba <- c(prob_ps[i,y_index[1],t,4],prob_ps[i,y_index[1],t,5],prob_ps[i,y_index[1],t,6]) # proba associated to each tercile - warning: we're inverting to have lower tercile 1st
+        quintile <- which.is.max(proba) # most likely quintile ################################ COULD BE IMPROVED
+        matrix4shp[i,1] <- quintile 
+        
+        if (prob_ps[i,y_index[1],t,quintile+3] > 0.5){ # likely quintile confidence
+        matrix4shp[i,2] <- 1
+       }
+   }
+    
+    matrix4shp[,3] <- unlist(vect_lat)
+    matrix4shp[,4] <- unlist(vect_lon)
+
+    # We create a 3 layer-raster: 1st with grid ID (useless), 2nd with most likely tercile forecasted; 3rd with wilcoxon test outcomes. 
+    
+    # we load the dataframe previously built and transform it into a raster
+    df_shp <- data.frame(matrix4shp)
+    colnames(df_shp) <- c("quintile", "confidence","lat","lon")
+    coordinates(df_shp) <- ~lon+lat
+    proj4string(df_shp) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+    shp_confprev <- st_as_sf(df_shp)
+    ras_prev <- raster(shp_confprev)
+    ext_prev <- extent(ras_prev)
+    mask.raster <- raster(resolution=c(0.1,0.072), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", ## !!!!!!!!!!!
+                          ext = ext_prev)
+    ras_prev_complete[[t]] <- rasterize(shp_confprev, mask.raster)
+    }
+  
+  # Stacking rasters from all the different months and saving it
+  
+  stacky <- stack(ras_prev_complete)
+  title <- paste0(indic[ind],"_confprevquin", annees[y],".tif")
+  writeRaster(stacky, filename=file.path(dir_plot, "season_raster", title), overwrite = TRUE)
+  }
+}
+layername <- names(stacky)
+save(layername, file = file.path(dir_plot, "season_raster", "layname.RData"))
+```
+
+
