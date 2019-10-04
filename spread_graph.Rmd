@@ -31,11 +31,11 @@ We load extracted indicator values, depending on indicator picked (to be specifi
 ind <- 8 # indicator
 
 # file loading
-nom_ref <- paste0(indic[ind],"_ref.RData")
-nom_prev <- paste0(indic[ind],"_prev.RData")
-nom_clim <- paste0(indic[ind],"_clim.RData")
-nom_av_clim <- paste0(indic[ind],"_ensmean_clim.RData")
-nom_av_prev <- paste0(indic[ind],"_ensmean_prev.RData")
+nom_ref <- paste0(indic[ind],b,"_ref.RData")
+nom_prev <- paste0(indic[ind],b,"_prev.RData")
+nom_clim <- paste0(indic[ind],b,"_clim.RData")
+nom_av_clim <- paste0(indic[ind],b,"_ensmean_clim.RData")
+nom_av_prev <- paste0(indic[ind],b,"_ensmean_prev.RData")
 
 load(file = file.path(dir_data, "extract", nom_ref))
 load(file = file.path(dir_data, "extract", nom_prev))
@@ -52,11 +52,11 @@ We compute and plot seasonal yearly ensemble variance for prevision and climatol
 ### data preparation: computing yearly seasonal ensemble variance for prevision and climatology
 df_value <- data.frame()
 for (y in 1:nan){
-  clim_values <- apply(array_clim[,y,,],c(1,2), mean) # seasonal averaging
-  prev_values <- apply(array_prev[,y,,],c(1,2), mean) # seasonal averaging
+  clim_values <- apply(array_clim[,y,,],1, mean) # seasonal ensemble averaging
+  prev_values <- apply(array_prev[,y,,],1, mean) # seasonal ensemble averaging
   
-  var_prev <- mean(apply(prev_values,c(1), var))
-  var_clim <- mean(apply(clim_values,c(1), var))
+  var_prev <- mean(var(prev_values))
+  var_clim <- mean(var(clim_values))
   
   df_value <- rbind(df_value, data.frame(type = "prevision", year=an[y], value = var_prev))
   df_value <- rbind(df_value, data.frame(type = "climato", year=an[y], value = var_clim))
@@ -74,18 +74,19 @@ We compute anomaly for prevision and climatology, following cross validation sch
 ```{r }
 ### COMPUTING CROSS VALIDATED ANOMALY  ------------------------------------------------------------------------
 df_value <- data.frame()
-clim_seasmean <- apply(clim_mean[,,],c(1,2), mean) # seasonal averaging
+clim_seasmean <- apply(clim_mean[,,],c(1,2), mean) # seasonal averaging from array i*y*t
 prev_seasmean <- apply(prev_mean[,,],c(1,2), mean) # seasonal averaging
 
 for (y in 1:nan){
   ref_seasmean <- apply(array_obs[,-y,],c(1), mean) # average over season + years, omitting year y for crossval scheme
-  anomaly_ps <- prev_seasmean[,y] - ref_seasmean
+  ps_seasmean <- apply(array_prev[,-y,,],c(1), mean) # average over season + years, omitting year y for crossval scheme
+  anomaly_ps <- prev_seasmean[,y] - ps_seasmean
   anomaly_clim <- clim_seasmean[,y] - ref_seasmean
+  anomaly_ref <- apply(array_obs[,y,],1,mean) - ref_seasmean
   df_value <- rbind(df_value, data.frame(type = "model", year=an[y], value = anomaly_ps))
-  df_value <- rbind(df_value, data.frame(type = "climato", year=an[y], value = anomaly_clim))
+  df_value <- rbind(df_value, data.frame(type = "ref", year=an[y], value = anomaly_ref))
 
 }
-  
   
 ### YEARLY BOXPLOTS  ------------------------------------------------------------------------
   ggplot(df_value, aes(factor(year), value)) + geom_boxplot(aes(fill=type))+

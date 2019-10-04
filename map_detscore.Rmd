@@ -30,7 +30,7 @@ Region of interest
 
 ```{r}
 moi <- c("May","June","July","August","September","October","November")
-ind <- 1
+ind <- 2
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -111,7 +111,7 @@ print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 ## Creating maps displaying prevision and skill shapefiles through ggplot package
 
 Same process as above
-ISSUE: centroids ain't central!!!!!!
+Issue when multi t plotting
 
 ```{r}
 mappy <- list()
@@ -150,14 +150,10 @@ mappy[[m]] <- ggmap(back_map) +
   geom_sf(data = shp_score[[m]], aes(fill = score), inherit.aes = FALSE)+
   scale_fill_gradient(low = "orange", high = "green")+
   geom_sf(data = sf_nrm, aes(colour = significance), inherit.aes = FALSE, size = 0.02, show.legend = FALSE)+
-  scale_colour_gradient(low = "blue", high = "blue")
-  
+  scale_colour_gradient(low = "blue", high = "blue")+
+  labs(title = paste0(ind_eng[ind]," ACC score for ", moi[m]))+
+  theme(plot.title = element_text(size = 12, hjust = 0, vjust = 1.5))
 
-ggmap(back_map) + 
-  geom_sf(data = shp_score[[m]], aes(fill = score), inherit.aes = FALSE)+
-  scale_fill_gradient(low = "orange", high = "green")+
-  geom_sf(data = sp_pt, aes(colour = significance.6), inherit.aes = FALSE, size = 0.02, show.legend = FALSE)+
-  scale_colour_gradient(low = "blue", high = "blue")
 
 #   if (m<4){
 #   print(mappy[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
@@ -168,9 +164,9 @@ ggmap(back_map) +
 # 
 }
 
-m <- 2 # to be specified
-map_multiT <- ggarrange(mappy[[1]], mappy[[2]], mappy[[3]], mappy[[4]], mappy[[5]], mappy[[6]], 
-                       common.legend = TRUE, labels = moi) + annotate_figure(map_comp, fig.lab = titre) 
-map_uniT <- mappy[[m]]
+#m <- 2 # to be specified
+#map_multiT <- ggarrange(mappy[[1]], mappy[[2]], mappy[[3]], mappy[[4]], mappy[[5]], mappy[[6]], 
+                       #common.legend = TRUE, labels = moi) + annotate_figure(map_comp, fig.lab = titre) 
+#map_uniT <- mappy[[m]]
 
 ```

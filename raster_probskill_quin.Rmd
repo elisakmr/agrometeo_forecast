@@ -52,8 +52,8 @@ for (ind in 1:3){
     load(file = file.path(dir_data, "score", nom_prev))
     load(file = file.path(dir_data, "score", nom_clim))
 
-    score_ps[,,1,b] <- scoreprob_ps[,,4] # low quintile
-    score_ps[,,2,b] <- scoreprob_ps[,,3] # high quintile
+    score_ps[,,1,b] <- scoreprob_ps[,,3] # low quintile
+    score_ps[,,2,b] <- scoreprob_ps[,,4] # high quintile
    
   }
    

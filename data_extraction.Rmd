@@ -67,22 +67,20 @@ N.B.: 75.78 sec elapsed
 ```{r, echo=FALSE}
 
 # generate random year series
-rand_year <- list()
-for (b in 1:1000){
-  rand_year[[b]] <- sample(1:nan, nan, replace = TRUE) 
-}
-save(rand_year, file = file.path(dir_data, "extract", "years.RData"))
+# rand_year <- list()
+# for (b in 1:500){
+#    rand_year[[b]] <- sample(1:nan, nan, replace = TRUE) 
+#  }
+#  save(rand_year, file = file.path(dir_data, "extract", "years.RData"))
 
-# extracting data
-cl <- makeCluster(no_core)
-registerDoParallel(cl)
-tictoc::tic()
+# array setting x*year(*run)*t
+run <- unique(clim_data[,"climatscenario"]) # ensemble members (same for climato and prevision)
+nrun <- length(run) # count of ens members - ignoring 0 set for reference only
 
-foreach(b=1:1000, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
-  
-  for (ind in 1:8){
-  
-  # indicator type filtering
+tictoc::tic() 
+for (ind in 2:8){
+
+ # indicator type filtering
     indic_data <- raw_data %>% 
       filter(indicator == indic[ind])
     
@@ -98,26 +96,42 @@ foreach(b=1:1000, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
     clim_data <- indic_data %>% 
       filter(climattype == "CLIMATO") %>% 
       arrange(lat,lon)
-      
-      # array setting x*year(*run)*t
-    run <- unique(clim_data[,"climatscenario"]) # ensemble members (same for climato and prevision)
-    nrun <- length(run) # count of ens members - ignoring 0 set for reference only
-  
-    array_obs <- array(NA, dim=c(ngrids, nan, ndimT))
-    array_prev <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
-    array_clim <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
-    
+
+# extracting data
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+
+foreach(b=1:500, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
+  array_obs <- array(NA, dim=c(ngrids, nan, ndimT))
+  array_prev <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
+  array_clim <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
+
     for (j in 1:nan){
       y <- rand_year[[b]][j]
+      
+      obs_int <- obs_data %>% 
+      filter(year_ == y+1992) 
+      prev_int1 <- prev_data %>% 
+      filter(year_ == y+1992) 
+      clim_int1 <- clim_data %>% 
+      filter(year_ == y+1992) 
+      
       for (t in 1:ndimT){
-        array_obs[,j,t] <- as.vector(unlist(obs_data %>% filter(year_ == y+1992, month_ == t+4) %>% select(indicatorvalue)))
+        array_obs[,j,t] <- as.vector(unlist(obs_int %>% filter(month_ == t+4) %>% select(indicatorvalue)))
+        
+        prev_int2 <- prev_int1 %>% 
+        filter(month_ == t+4) 
+        clim_int2 <- clim_int1 %>% 
+        filter(month_ == t+4) 
+ 
         for (r in 1:nrun){
         # indicator value extracting
-        array_prev[,j,r,t] <- as.vector(unlist(prev_data %>% filter(year_ == y+1992, month_ == t+4, climatscenario == r) %>% select(indicatorvalue)))
-        array_clim[,j,r,t] <- as.vector(unlist(clim_data %>% filter(year_ == y+1992, month_ == t+4, climatscenario == r) %>% select(indicatorvalue)))
+        array_prev[,j,r,t] <- as.vector(unlist(prev_int2 %>% filter(climatscenario == r) %>% select(indicatorvalue)))
+        array_clim[,j,r,t] <- as.vector(unlist(clim_int2 %>% filter(climatscenario == r) %>% select(indicatorvalue)))
         }
       }
     }
+  
     nom_ref <- paste0(indic[ind],b,"_ref.RData")
     nom_prev <- paste0(indic[ind],b,"_prev.RData")
     nom_clim <- paste0(indic[ind],b,"_clim.RData")
@@ -125,9 +139,10 @@ foreach(b=1:1000, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
     save(array_obs, file = file.path(dir_data, "extract", nom_ref))
     save(array_prev, file = file.path(dir_data, "extract", nom_prev))
     save(array_clim, file = file.path(dir_data, "extract", nom_clim))
-    }
+} 
+stopCluster(cl)
 }
 
 tictoc::toc()
-stopCluster(cl)
+
 ```

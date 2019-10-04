@@ -88,21 +88,35 @@ quant_sup_obs <- vector()
 ## Function transforming continuous into binary (array > array)
 
 ```{r setup, include=FALSE}
-tercquint <- function (type, array_cont, nanne, ncells, ndims){
-  array_binprob <- array(NA, dim=c(ncells, nanne, ndims, 6))
-  for (t in 1:ndimT){
-    for (i in 1:ngrids){
-      if (type == "obs") { int_df <- array_cont[i,,t] }
-      else if (type == "prev") { int_df <- array_cont[i,,,t] }
-          hterc_vect <- binprob(int_df, nban=nanne, prob=1/3, rang="H", type)
-          mterc_vect <- binprob(int_df, nban=nanne, prob=1/3, rang="M", type)
-          lterc_vect <- binprob(int_df, nban=nanne, prob=1/3, rang="L", type)
-          hquin_vect <- binprob(int_df, nban=nanne, prob=1/5, rang="H", type)
-          mquin_vect <- binprob(int_df, nban=nanne, prob=1/5, rang="M", type)
-          lquin_vect <- binprob(int_df, nban=nanne, prob=1/5, rang="L", type)
+tercquint <- function (type, temp, array_cont, nanne, ncells, ndims){
   
-      array_binprob[i,,t,1:6] <- c(lterc_vect, mterc_vect, hterc_vect, lquin_vect, mquin_vect, hquin_vect) 
+  if (temp == "monthly"){
+    array_binprob <- array(NA, dim=c(ncells, nanne, ndims, 6))
+      ifelse(type == "obs", {int_df <- array_cont[,,] ; d =c(1,3)}, {int_df <- array_cont[,,,] ; d=c(1,4)})
+      hterc_vect <- apply(int_df, d, binprob, nban=nanne, prob=1/3, rang="H", type)
+      lterc_vect <- apply(int_df, d, binprob, nban=nanne, prob=1/3, rang="L", type)
+      mterc_vect <- apply(int_df, d, binprob, nban=nanne, prob=1/3, rang="M", type)
+      lquin_vect <- apply(int_df, d, binprob, nban=nanne, prob=1/5, rang="L", type)
+      mquin_vect <- apply(int_df, d, binprob, nban=nanne, prob=1/5, rang="M", type)
+      hquin_vect <- apply(int_df, d, binprob, nban=nanne, prob=1/5, rang="H", type)
+    
+        array_binprob[,,,1:6] <- c(lterc_vect, mterc_vect, hterc_vect, lquin_vect, mquin_vect, hquin_vect) 
+      
     }
+    
+  
+  if (temp == "seasonal"){
+    array_binprob <- array(NA, dim=c(ncells, nanne, 6))
+      ifelse(type == "obs", int_df <- apply(array_cont[,,],c(1,2), sum), int_df <- apply(array_cont[,,,],c(1,2,3), sum))
+      hterc_vect <- apply(int_df, 1, binprob, nban=nanne, prob=1/3, rang="H", type)
+      lterc_vect <- apply(int_df, 1, binprob, nban=nanne, prob=1/3, rang="L", type)
+      mterc_vect <- apply(int_df, 1, binprob, nban=nanne, prob=1/3, rang="M", type)
+      lquin_vect <- apply(int_df, 1, binprob, nban=nanne, prob=1/5, rang="L", type)
+      mquin_vect <- apply(int_df, 1, binprob, nban=nanne, prob=1/5, rang="M", type)
+      hquin_vect <- apply(int_df, 1, binprob, nban=nanne, prob=1/5, rang="H", type)
+
+    array_binprob[,,1:6] <- c(lterc_vect, mterc_vect, hterc_vect, lquin_vect, mquin_vect, hquin_vect) 
+      
   }
   return(array_binprob)
 }
@@ -122,7 +136,7 @@ bias <- function(observed, predicted){
 # function computing scores for the box, weighting points as function of latitude
 
 ```{r setup, include=FALSE}
-score_boite_prob = function(prev_prob, obs_bin, t, lati, nb_bin, e)
+score_boite_prob = function(prev_prob, obs_bin, lati, nb_bin, e)
 {
   # Calcul de HR et FAR pour scores ROC et diag de fiabilite sur des zones.
   # Agregation des previsions probabilistes de chaque point,
@@ -143,8 +157,8 @@ score_boite_prob = function(prev_prob, obs_bin, t, lati, nb_bin, e)
   
   for (bin in (1:nb_bin)) {
     for (i in ngrids){
-        vect_prev <- prev_prob[i,,t,e]
-        vect_obs <- obs_bin[i,,t,e]
+        vect_prev <- prev_prob[i,,e]
+        vect_obs <- obs_bin[i,,e]
         O[bin] = O[bin] + cos(pi*lati[i]/180)*length(which(vect_prev>=((bin-1)/nb_bin) 
                                                            & vect_prev<(bin/nb_bin) & vect_obs==1))
         NO[bin] = NO[bin] + cos(pi*lati[i]/180)*length(which(vect_prev>=((bin-1)/nb_bin) 

@@ -83,7 +83,7 @@ for (ind in 1:3){
  
     if (wacc$p.value < 0.05) {
       
-      [i,2] <- 1 
+      matrix4shp[i,2] <- 1 
     }
   }
     

@@ -13,8 +13,9 @@ library(foreach)
 library(iterators)
 library(parallel)
 library(doParallel)
+library(easyVerification)
 no_core <- 5
-
+e<-3
 ```
 
 ## Transforming continuous arrays 
@@ -22,31 +23,58 @@ no_core <- 5
 Regarding 4 selected events (higher/lower tercile/quintile) reference continuous values are transformed into binary values; ensemble prevision values are transformed into probabilistic values (computed from the ensemble spread). 
 
 ```{r}
-cl <- makeCluster(no_core)
-registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:1000, .packages="tidyverse", .export = 'tercquint') %dopar%  { # loop on bootstrap samples
-for (ind in 1:8){
-  
-  nom_ref <- paste0(indic[ind],b,"_ref.RData")
-  nom_prev <- paste0(indic[ind],b,"_prev.RData")
 
-  load(file = file.path(dir_data, "extract", nom_ref))
-  load(file = file.path(dir_data, "extract", nom_prev))
-
-  prob_ps <- tercquint("prev", array_prev, nan, ngrids, ndimT)
-  
-  bin_ref <- tercquint("obs", array_obs, nan, ngrids, ndimT)
-  
-  nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
-  nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
-  
-  save(prob_ps, file = file.path(dir_data, "extract", nom_prev))
-  save(bin_ref, file = file.path(dir_data, "extract", nom_ref))
-
+for (ind in 4:8){
+  cl <- makeCluster(no_core)
+  registerDoParallel(cl)
+  foreach(b=1:500, .packages=c("tidyverse","easyVerification")) %dopar%  { # loop on bootstrap samples
+    
+    
+    nom_ref <- paste0(indic[ind],b,"_ref.RData")
+    nom_prev <- paste0(indic[ind],b,"_prev.RData")
+    
+    load(file = file.path(dir_data, "extract", nom_ref))
+    load(file = file.path(dir_data, "extract", nom_prev))
+    
+    # seasonal
+    int_obs <- apply(array_obs[,,],c(1,2), sum)
+    int_prev <- apply(array_prev[,,,],c(1,2,3), sum)
+    seasbin_ref <- array (NA, dim=c(ngrids,nan,e))
+    seasprob_ps <- array (NA, dim=c(ngrids,nan,e))
+    for (i in 1:ngrids){
+    seasbin_ref[i,,] <- count2prob(convert2prob(int_obs[i,], prob = 1:2/3), type = 4)
+    seasprob_ps[i,,] <- count2prob(convert2prob(int_prev[i,,], prob = 1:2/3), type = 4)
+    }
+    
+    nom_prevseas <- paste0(indic[ind],b,"_seasprob_prev.RData")
+    nom_refseas <- paste0(indic[ind],b,"_seasbin_obs.RData")
+    
+    save(seasprob_ps, file = file.path(dir_data, "extract", nom_prevseas))
+    save(seasbin_ref, file = file.path(dir_data, "extract", nom_refseas))
+    
+    # monthly
+    if (ind != 3|4|5) { # continuous indicators only
+      monthbin_ref <- array (NA, dim=c(ngrids,nan,ndimT,e))
+      monthprob_ps <- array (NA, dim=c(ngrids,nan,ndimT,e))
+ 
+      for (t in 1:ndimT){
+        for (i in 1:ngrids){
+          monthbin_ref[i,,t,] <- count2prob(convert2prob(array_obs[i,,t], prob = 1:2/3), type = 4)
+          monthprob_ps[i,,t,] <- count2prob(convert2prob(array_prev[i,,,t], prob = 1:2/3), type = 4)
+        }
+      }
+    
+      nom_prevmonth <- paste0(indic[ind],b,"_monthprob_prev.RData")
+      nom_refmonth <- paste0(indic[ind],b,"_monthbin_obs.RData")
+      
+      save(monthprob_ps, file = file.path(dir_data, "extract", nom_prevmonth))
+      save(monthbin_ref, file = file.path(dir_data, "extract", nom_refmonth))
+    }
+    
+  }
+  stopCluster(cl)
 }
- }
-stopCluster(cl)
+
 tictoc::toc()
 ```
-

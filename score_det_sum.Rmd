@@ -1,0 +1,103 @@
+---
+title: "Summarizing deterministic scores"
+output: html_document
+---
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+library(dplyr)
+library(tidyverse)
+library(plyr)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+library(readr)
+no_core <- 5
+
+```
+
+## Computing box scores 
+
+We aggregate gridded deterministic scores with latitude weighting.
+21.72 sec elapsed
+
+```{r setup, include=FALSE}
+
+load(file = file.path(dir_data, "extract", "lat.RData"))
+lati <- as.vector(vect_lat)
+
+boot_prev <- list()
+boot_clim <- list()
+
+for (ind in 1:8){
+   
+    for(b in 1:1000)   {
+    # loading gridded scores
+      # monthly
+    nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
+    nom_climmonth <- paste0(indic[ind], b,"scoredetmonth_grid_clim.RData")
+    load(file = file.path(dir_data, "score", nom_prevmonth))
+    load(file = file.path(dir_data, "score", nom_climmonth))
+    
+      # seasonal
+    nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
+    nom_climseas <- paste0(indic[ind], b,"scoredetseas_grid_clim.RData")
+    load(file = file.path(dir_data, "score", nom_prevseas))
+    load(file = file.path(dir_data, "score", nom_climseas))
+   
+    box_prev_month <- matrix(nrow = ndimT, ncol = 3)
+    box_clim_month <- matrix(nrow = ndimT, ncol = 3)
+    box_prev_seas <- vector()
+    box_clim_seas <- vector()
+    
+    # monthly 
+      for (t in 1:ndimT){
+       # box aggregation with latitude weighting
+        val_prevmonth <- list()
+        val_climmonth <- list()
+        coeff <- vector()
+        
+         for (i in 1:ngrids){
+            val_prevmonth[[i]] <- detmonth_prev[i,,t]*cos(pi*lati[i,1]/180)
+            val_climmonth[[i]] <- detmonth_clim[i,,t]*cos(pi*lati[i,1]/180)
+            coeff[i] <- cos(pi*lati[i,1]/180)
+         }
+        
+        box_prev_month[t,] <- Reduce("+", val_prevmonth)/sum(coeff)
+        box_clim_month[t,] <- Reduce("+", val_climmonth)/sum(coeff)
+        
+      }
+    
+    # seasonal
+     val_prevseas <- list()
+     val_climseas <- list()
+        coeff <- vector()
+        
+         for (i in 1:ngrids){
+            val_prevseas[[i]] <- detmonth_prev[i,,t]*cos(pi*lati[i,1]/180)
+            val_climmonth[[i]] <- detmonth_clim[i,,t]*cos(pi*lati[i,1]/180)
+            coeff[i] <- cos(pi*lati[i,1]/180)
+         }
+        
+        box_prev_seas <- Reduce("+", val_prevseas)/sum(coeff)
+        box_clim_seas <- Reduce("+", val_climseas)/sum(coeff)
+    }
+  
+  seas_clim <- Reduce("+", box_clim_seas)/1000
+  seas_ps <- Reduce("+", box_prev_seas)/1000
+  
+  nom_psmonth <- paste0(indic[ind], "monthdet_box_prev.csv")
+  nom_climmonth <- paste0(indic[ind], "monthdet_box_clim.csv")
+  nom_psseas <- paste0(indic[ind], "seasdet_box_prev.csv")
+  nom_climseas <- paste0(indic[ind], "seasdet_box_clim.csv")
+    
+  write_csv(as.data.frame(month_ps), file.path(dir_data, "score", nom_psmonth))
+  write_csv(as.data.frame(month_clim), file.path(dir_data, "score", nom_climmonth))
+  write_csv(as.data.frame(seas_ps), file.path(dir_data, "score", nom_psseas))
+  write_csv(as.data.frame(seas_clim), file.path(dir_data, "score", nom_climseas))
+  
+}
+
+```
+

@@ -15,6 +15,7 @@ library(foreach)
 library(iterators)
 library(parallel)
 library(doParallel)
+library(readr)
 no_core <- 5
 
 ```
@@ -22,11 +23,22 @@ no_core <- 5
 
 ```{r setup, include=FALSE}
 #
+tictoc::tic()
+Spearman <- s2dverification:::.Corr
+
+acc_prev <- vector()
+acc_clim <- vector()
+biais_prev <- vector()
+biais_clim <- vector()
+rms_prev <- vector()
+rms_clim <- vector()
+
+for (ind in 3:8){
+
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
-tictoc::tic()
-foreach(b=1:1000, .packages='easyVerification') %dopar%  { # loop on bootstrap samples
-for (ind in 1:8){
+
+foreach(b=1:500, .packages='easyVerification') %dopar%  { # loop on bootstrap samples
 
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
   nom_prev <- paste0(indic[ind],b,"_prev.RData")
@@ -43,86 +55,116 @@ for (ind in 1:8){
   load(file = file.path(dir_data, "extract", nom_an_obs))
   
   
-  ## Score computing: We compute bias, and cross validated rmse and correlation coefficient.
+  ### Score computing: We compute bias, and cross validated rmse and correlation coefficient.
   
-  det_prev <- array(NA, dim = c(ngrids,3,ndimT))
-  det_clim <- array(NA, dim = c(ngrids,3,ndimT))
+      ### MONTHLY ###
+  
+  detmonth_prev <- array(NA, dim = c(ngrids,3,ndimT))
+  detmonth_clim <- array(NA, dim = c(ngrids,3,ndimT))
   
   for (t in 1:ndimT){ 
+    
+    # MSESS
   
-    # bias
+    EnsMsess(ens, ens.ref, obs)
+
+    # BIAS #
+    
         # ref vs prev
     biais_prev = veriApply("EnsMe", fcst=array_prev[,,,t], obs=array_obs[,,t])
         # ref vs clim
     biais_clim = veriApply("EnsMe", fcst=array_clim[,,,t], obs=array_obs[,,t])
   
-    # rmse
+    # RMSE #
+    
         # ref vs prev
     rms_prev = veriApply("EnsRmse", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t])
         # ref vs CLIM
     rms_clim = veriApply("EnsRmse", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t])
     
-    # anomaly correlation coefficient
+    # ACC #
     
-    #diag(cor(t(anomaly_mean), t(obs_anomaly[,,t]))) # per row correlation
-    
+      # Pearson for continued indicators
+    if (ind!=3 & ind!=4 & ind!=5) { 
       # ref vs prev
     acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t])
       # ref vs clim
     acc_clim <- veriApply("EnsCorr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t])
+    
+    } else { # Spearman for ordinal indicators
+      # ref vs prev
+    acc_prev <- veriApply("Spearman", prev_anomaly[,,,t], obs_anomaly[,,t], method = 'spearman')$corr
+      # ref vs clim
+    acc_clim <- veriApply("Spearman", clim_anomaly[,,,t], obs_anomaly[,,t], method = 'spearman')$corr
+      
+    }
   
-  det_prev[,,t] <- array(c(acc_prev, biais_prev, rms_prev), dim=c(ngrids,3))
-  det_clim[,,t] <- array(c(acc_clim, biais_clim, rms_clim), dim=c(ngrids,3))
-  
+  detmonth_prev[,,t] <- array(c(acc_prev, biais_prev, rms_prev), dim=c(ngrids,3))
+
   }
-  nom_prev <- paste0(indic[ind], b,"scoredet_grid_prev.RData")
-  nom_clim <- paste0(indic[ind], b,"scoredet_grid_clim.RData")
   
-  save(det_prev, file = file.path(dir_data, "score", nom_prev))
-  save(det_clim, file = file.path(dir_data, "score", nom_clim))
-}
+      ### SEASONAL ###
+  
+  detseas_prev <- array(NA, dim = c(ngrids,3))
+
+  prev_seas <- apply(array_prev, c(1,2,3), sum)
+  clim_seas <- apply(array_clim, c(1,2,3), sum)
+  ref_seas <- apply(array_obs, c(1,2), sum)
+  
+  anoprev_seas <- apply(prev_anomaly, c(1,2,3), sum)
+  anoclim_seas <- apply(clim_anomaly, c(1,2,3), sum)
+  anoref_seas <- apply(obs_anomaly, c(1,2), sum)
+  
+    # BIAS #
+  
+        # ref vs prev
+    biais_prev = veriApply("EnsMe", fcst=prev_seas, obs=ref_seas)
+        # ref vs clim
+    biais_clim = veriApply("EnsMe", fcst=clim_seas, obs=ref_seas)
+  
+    # RMSE #
+    
+        # ref vs prev
+    rms_prev = veriApply("EnsRmse", fcst=anoprev_seas, obs=anoref_seas)
+        # ref vs CLIM
+    rms_clim = veriApply("EnsRmse", fcst=anoclim_seas, obs=anoref_seas)
+    
+    # ACC #
+    
+      # Pearson for continued indicators
+        if (ind!=3 & ind!=4 & ind!=5) { 
+      # ref vs prev
+    acc_prev <- veriApply("EnsCorr", fcst=anoprev_seas, obs=anoref_seas)
+      # ref vs clim
+    acc_clim <- veriApply("EnsCorr", fcst=anoclim_seas, obs=anoref_seas)
+    
+        } else { # Spearman for ordinal indicators
+      # ref vs prev
+    acc_prev <- veriApply("Spearman", anoprev_seas, anoref_seas, method = 'spearman')$corr
+      # ref vs clim
+    acc_clim <- veriApply("Spearman", anoclim_seas, anoref_seas, method = 'spearman')$corr
+        
+    }
+    
+  detseas_prev[,] <- array(c(acc_prev, biais_prev, rms_prev), dim=c(ngrids,3))
+  detseas_clim[,] <- array(c(acc_clim, biais_clim, rms_clim), dim=c(ngrids,3))
+  
+  nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
+  nom_climmonth <- paste0(indic[ind], b,"scoredetmonth_grid_clim.RData")
+  nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
+  nom_climseas <- paste0(indic[ind], b,"scoredetseas_grid_clim.RData")
+  
+  save(detmonth_prev, file = file.path(dir_data, "score", nom_prevmonth))
+  save(detmonth_clim, file = file.path(dir_data, "score", nom_climmonth))
+  save(detseas_prev, file = file.path(dir_data, "score", nom_prevseas))
+  save(detseas_clim, file = file.path(dir_data, "score", nom_climseas))
+
 }
 stopCluster(cl)
+
+}
 tictoc::toc() 
 
 ```
-## Computing box scores 
 
-We aggregate gridded deterministic scores with latitude weighting.
-21.72 sec elapsed
 
-```{r setup, include=FALSE}
-cl <- makeCluster(no_core)
-registerDoParallel(cl)
-tictoc::tic()
-foreach(b=1:10) %dopar%  { # loop on bootstrap samples
-load(file = file.path(dir_data, "extract", "lat.RData"))
-lati <- as.vector(vect_lat)
-
-for (ind in 1:2){
-  # loading gridded scores
-  nom_prev <- paste0(indic[ind], b,"scoredet_grid_prev.RData")
-  nom_clim <- paste0(indic[ind], b,"scoredet_grid_clim.RData")
-  load(file = file.path(dir_data, "score", nom_prev))
-  load(file = file.path(dir_data, "score", nom_clim))
-  
-  boxdet_prev <- matrix(nrow = ndimT, ncol = 3)
-  boxdet_clim <- matrix(nrow = ndimT, ncol = 3)
-  for (t in 1:ndimT){
- # box aggregation with latitude weighting
-  boxdet_prev[t,] <- det_prev[i,,t]*cos(pi*lati[i,1]/180)
-  boxdet_clim[t,] <- det_prev[i,,t]*cos(pi*lati[i,1]/180)
-
-  }
-  nom_ps <- paste0(indic[ind], b,"scoredet_box_prev.RData")
-  nom_clim <- paste0(indic[ind], b,"scoredet_box_clim.RData")
-  
-  save(boxdet_prev, file = file.path(dir_data, "score", nom_ps))
-  save(boxdet_clim, file = file.path(dir_data, "score", nom_clim))
-
-}
-}
-stopCluster(cl)
-tictoc::toc() 
-
-```
