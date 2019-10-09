@@ -185,3 +185,13 @@ score_boite_prob = function(prev_prob, obs_bin, lati, nb_bin, e)
   
 }
 ```
+## Correlation Spearman for ordinal indicators
+
+```{r setup, include=FALSE}
+
+corel <- function(x,y){
+  Spearman <- s2dverification:::.Corr
+  out <- veriApply("Spearman", x, y, method = 'spearman')$corr
+  return(out)
+}
+```

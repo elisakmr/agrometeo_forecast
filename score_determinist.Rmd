@@ -16,7 +16,7 @@ library(iterators)
 library(parallel)
 library(doParallel)
 library(readr)
-no_core <- 5
+no_core <- 6
 
 ```
 ## Computing grid scores and saving them in arrays called "det_"
@@ -24,22 +24,22 @@ no_core <- 5
 ```{r setup, include=FALSE}
 #
 tictoc::tic()
-Spearman <- s2dverification:::.Corr
-
 acc_prev <- vector()
 acc_clim <- vector()
-biais_prev <- vector()
-biais_clim <- vector()
-rms_prev <- vector()
-rms_clim <- vector()
+msess <- vector()
 
-for (ind in 3:8){
+for (ind in 3:5){
+   # require(doSNOW)
+   # registerDoSNOW(makeCluster(2, type = "SOCK"))
 
+  # , .verbose = T
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
+#registerDoSNOW(cl)
 
-foreach(b=1:500, .packages='easyVerification') %dopar%  { # loop on bootstrap samples
-
+foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { # loop on bootstrap samples
+#Spearman <- easyVerification:::EnsCorr
+  
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
   nom_prev <- paste0(indic[ind],b,"_prev.RData")
   nom_clim <- paste0(indic[ind],b,"_clim.RData")
@@ -54,110 +54,91 @@ foreach(b=1:500, .packages='easyVerification') %dopar%  { # loop on bootstrap sa
   load(file = file.path(dir_data, "extract", nom_an_clim))
   load(file = file.path(dir_data, "extract", nom_an_obs))
   
-  
+  # ensemble mean 
+  prev_mean <- apply(array_prev, c(1,2,4), mean)
+  clim_mean <- apply(array_clim, c(1,2,4), mean)
+
   ### Score computing: We compute bias, and cross validated rmse and correlation coefficient.
   
       ### MONTHLY ###
   
-  detmonth_prev <- array(NA, dim = c(ngrids,3,ndimT))
-  detmonth_clim <- array(NA, dim = c(ngrids,3,ndimT))
-  
+  det_month <- array(NA, dim = c(ngrids,3,ndimT))
+
   for (t in 1:ndimT){ 
     
     # MSESS
-  
-    EnsMsess(ens, ens.ref, obs)
+    
+  msess <- veriApply("EnsMsess", fcst=t(prev_mean[,,t]), fcst.ref=t(clim_mean[,,t]), obs=t(array_obs[,,t]), parallel = TRUE)
 
-    # BIAS #
-    
-        # ref vs prev
-    biais_prev = veriApply("EnsMe", fcst=array_prev[,,,t], obs=array_obs[,,t])
-        # ref vs clim
-    biais_clim = veriApply("EnsMe", fcst=array_clim[,,,t], obs=array_obs[,,t])
-  
-    # RMSE #
-    
-        # ref vs prev
-    rms_prev = veriApply("EnsRmse", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t])
-        # ref vs CLIM
-    rms_clim = veriApply("EnsRmse", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t])
-    
-    # ACC #
+   # ACC #
     
       # Pearson for continued indicators
-    if (ind!=3 & ind!=4 & ind!=5) { 
+    #if (ind!=3 & ind!=4 & ind!=5) { 
       # ref vs prev
-    acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t])
+    acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)
       # ref vs clim
-    acc_clim <- veriApply("EnsCorr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t])
+    acc_clim <- veriApply("EnsCorr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)
     
-    } else { # Spearman for ordinal indicators
-      # ref vs prev
-    acc_prev <- veriApply("Spearman", prev_anomaly[,,,t], obs_anomaly[,,t], method = 'spearman')$corr
-      # ref vs clim
-    acc_clim <- veriApply("Spearman", clim_anomaly[,,,t], obs_anomaly[,,t], method = 'spearman')$corr
-      
-    }
+    # } else { # Spearman for ordinal indicators
+    #   Spearman <- s2dverification:::.Corr
+    #   # ref vs prev
+    # acc_prev <- veriApply("Corr", fcst=clim_anomaly[,,,t], obs=clim_anomaly[,,,t],  posloop = 2,)$corr
+    #   # ref vs clim
+    # acc_clim <- veriApply("Corr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)$corr
+    #   
+    # }
   
-  detmonth_prev[,,t] <- array(c(acc_prev, biais_prev, rms_prev), dim=c(ngrids,3))
+  det_month[,,t] <- array(c(msess, acc_prev, acc_clim), dim=c(ngrids,3))
 
   }
   
       ### SEASONAL ###
   
   detseas_prev <- array(NA, dim = c(ngrids,3))
-
+  detseas_clim <- array(NA, dim = c(ngrids,3))
+  
   prev_seas <- apply(array_prev, c(1,2,3), sum)
   clim_seas <- apply(array_clim, c(1,2,3), sum)
   ref_seas <- apply(array_obs, c(1,2), sum)
+  
+  prev_seas_mean <- apply(prev_seas, c(1,2), mean)
+  clim_seas_mean <- apply(clim_seas, c(1,2), mean)
   
   anoprev_seas <- apply(prev_anomaly, c(1,2,3), sum)
   anoclim_seas <- apply(clim_anomaly, c(1,2,3), sum)
   anoref_seas <- apply(obs_anomaly, c(1,2), sum)
   
-    # BIAS #
-  
-        # ref vs prev
-    biais_prev = veriApply("EnsMe", fcst=prev_seas, obs=ref_seas)
-        # ref vs clim
-    biais_clim = veriApply("EnsMe", fcst=clim_seas, obs=ref_seas)
-  
-    # RMSE #
+    # MSESS
     
-        # ref vs prev
-    rms_prev = veriApply("EnsRmse", fcst=anoprev_seas, obs=anoref_seas)
-        # ref vs CLIM
-    rms_clim = veriApply("EnsRmse", fcst=anoclim_seas, obs=anoref_seas)
-    
+  msess <- veriApply("EnsMsess", fcst=t(prev_seas_mean), fcst.ref=t(clim_seas_mean), obs=t(ref_seas), parallel = TRUE)
+
     # ACC #
     
       # Pearson for continued indicators
-        if (ind!=3 & ind!=4 & ind!=5) { 
+        #if (ind!=3 & ind!=4 & ind!=5) { 
       # ref vs prev
     acc_prev <- veriApply("EnsCorr", fcst=anoprev_seas, obs=anoref_seas)
       # ref vs clim
     acc_clim <- veriApply("EnsCorr", fcst=anoclim_seas, obs=anoref_seas)
     
-        } else { # Spearman for ordinal indicators
-      # ref vs prev
-    acc_prev <- veriApply("Spearman", anoprev_seas, anoref_seas, method = 'spearman')$corr
-      # ref vs clim
-    acc_clim <- veriApply("Spearman", anoclim_seas, anoref_seas, method = 'spearman')$corr
-        
-    }
+    #     } else { # Spearman for ordinal indicators
+    #       Spearman <- s2dverification:::.Corr
+    #   # ref vs prev
+    # acc_prev <- veriApply("Corr", fcst=anoprev_seas, obs=anoref_seas, parallel = TRUE)$corr
+    #   # ref vs clim
+    # acc_clim <- veriApply("Corr", fcst=anoclim_seas, obs=anoref_seas, parallel = TRUE)$corr
+    #    
+    # }
     
-  detseas_prev[,] <- array(c(acc_prev, biais_prev, rms_prev), dim=c(ngrids,3))
-  detseas_clim[,] <- array(c(acc_clim, biais_clim, rms_clim), dim=c(ngrids,3))
+  det_seas <- array(c(msess, acc_prev, acc_clim), dim=c(ngrids,3))
   
   nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
-  nom_climmonth <- paste0(indic[ind], b,"scoredetmonth_grid_clim.RData")
   nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
-  nom_climseas <- paste0(indic[ind], b,"scoredetseas_grid_clim.RData")
-  
+
   save(detmonth_prev, file = file.path(dir_data, "score", nom_prevmonth))
-  save(detmonth_clim, file = file.path(dir_data, "score", nom_climmonth))
   save(detseas_prev, file = file.path(dir_data, "score", nom_prevseas))
-  save(detseas_clim, file = file.path(dir_data, "score", nom_climseas))
+
+  gc(TRUE)
 
 }
 stopCluster(cl)

@@ -42,14 +42,14 @@ for (ind in 1:8){
     
       score_ps <- array(NA, dim=c(ngrids, event, 1000)) 
   
-    for (b in 1:1000)  { 
+    for (b in 1:500)  { 
       
       nom_prev <- paste0(indic[ind], b,"scoreprobseason_grid_prev.RData")
   
       load(file = file.path(dir_data, "score", nom_prev))
   
-      score_ps[,1,b] <- scoreprob_ps[,1] # low tercile
-      score_ps[,2,b] <- scoreprob_ps[,2] # high tercile
+      score_ps[,1,b] <- scoreprob_seas_ps[,1] # low tercile
+      score_ps[,2,b] <- scoreprob_seas_ps[,2] # high tercile
     
     }
     
@@ -125,8 +125,8 @@ score_ps <- array(NA, dim=c(ngrids, ndimT, event, 1000))
 
     load(file = file.path(dir_data, "score", nom_prev))
 
-    score_ps[,,1,b] <- scoreprob_ps[,,1] # low tercile
-    score_ps[,,2,b] <- scoreprob_ps[,,2] # high tercile
+    score_ps[,,1,b] <- scoreprob_month_ps[,,1] # low tercile
+    score_ps[,,2,b] <- scoreprob_month_ps[,,2] # high tercile
   
   }
    

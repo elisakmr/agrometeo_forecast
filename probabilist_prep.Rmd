@@ -14,7 +14,7 @@ library(iterators)
 library(parallel)
 library(doParallel)
 library(easyVerification)
-no_core <- 5
+no_core <- 6
 e<-3
 ```
 

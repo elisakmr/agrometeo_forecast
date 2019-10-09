@@ -17,7 +17,7 @@ library(foreach)
 library(iterators)
 library(parallel)
 library(doParallel)
-no_core <- 5
+no_core <- 6
 e<-4
 ```
 

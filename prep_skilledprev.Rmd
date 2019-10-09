@@ -25,7 +25,7 @@ for (ind in 1:2){
   
       # loading scores (to be summarized later)
   
-  for (b in 1:100)  { 
+  for (b in 1:500)  { 
   
     for (e in 1:2){
   

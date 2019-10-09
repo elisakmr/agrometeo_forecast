@@ -44,12 +44,12 @@ for (ind in 1:3){
   score_ps <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
   score_clim <- array(NA, dim=c(ngrids, ndimT, event, 1000)) 
   
-  for (b in 1:1000)  { 
+  for (b in 1:500)  { 
   
     for (e in 1:3){
   
-    nom_prev <- paste0(indic[ind], b,"scoredet_grid_prev.RData")
-    nom_clim <- paste0(indic[ind], b,"scoredet_grid_clim.RData")
+    nom_prev <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
+    nom_clim <- paste0(indic[ind], b,"scoredetmonth_grid_clim.RData")
     
     load(file = file.path(dir_data, "score", nom_prev))
     load(file = file.path(dir_data, "score", nom_clim))
