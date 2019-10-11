@@ -28,7 +28,7 @@ acc_prev <- vector()
 acc_clim <- vector()
 msess <- vector()
 
-for (ind in 3:5){
+for (ind in 1:8){
    # require(doSNOW)
    # registerDoSNOW(makeCluster(2, type = "SOCK"))
 
@@ -94,9 +94,8 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
   
       ### SEASONAL ###
   
-  detseas_prev <- array(NA, dim = c(ngrids,3))
-  detseas_clim <- array(NA, dim = c(ngrids,3))
-  
+  det_seas <- array(NA, dim = c(ngrids,3))
+
   prev_seas <- apply(array_prev, c(1,2,3), sum)
   clim_seas <- apply(array_clim, c(1,2,3), sum)
   ref_seas <- apply(array_obs, c(1,2), sum)
@@ -135,8 +134,8 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
   nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
   nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
 
-  save(detmonth_prev, file = file.path(dir_data, "score", nom_prevmonth))
-  save(detseas_prev, file = file.path(dir_data, "score", nom_prevseas))
+  save(det_month, file = file.path(dir_data, "score", nom_prevmonth))
+  save(det_seas, file = file.path(dir_data, "score", nom_prevseas))
 
   gc(TRUE)
 

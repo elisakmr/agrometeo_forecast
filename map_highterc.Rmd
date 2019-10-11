@@ -47,7 +47,7 @@ stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack fil
 load(file = file.path(dir_plot, "season_raster", "prob_layname.RData")) # loading stack layer names before writeraster changed them
 names(stacky) <- c(layername)# re setting original layer names
 ```
-## Creating maps displaying prevision and skill shapefiles
+### MONTHLY MAPS ###
 
 We create one shapefile per month from each raster layer extraction
 

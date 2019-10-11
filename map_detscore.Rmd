@@ -38,20 +38,32 @@ ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy day
              "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
 
 ```
-## Loading raster
+### LOADING RASTER FILES ###
 
-Specific to indicator and year of prevision
 
 ```{r}
-load(file = file.path(dir_plot, "season_raster", "det_layname.RData")) # loading stack layer names before writeraster changed them
+title <- paste0(indic[ind],"_detseas",".tif")
+stacky_seas <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
 
-title <- paste0(indic[ind],"_detsign.tif")
-stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+if (ind!=3 & ind!=4 & ind!=5) { 
+  title <- paste0(indic[ind],"_detmonth",".tif")
+  stacky_mois <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+}
 
-names(stacky) <- c(layername)# re setting original layer names
+load(file = file.path(dir_plot, "season_raster", "layname_detmonth.RData")) # loading stack layer names before writeraster changed them
+names(stacky_mois) <- c(layername)# re setting original layer names
+
+load(file = file.path(dir_plot, "season_raster", "layname_detseas.RData")) # loading stack layer names before writeraster changed them
+names(stacky_seas) <- c(layername)# re setting original layer names
+
+score_palette <- c("#ca0020","#f4a582","#f7f7f7","#92c5de","#0571b0")
+rain_palette <- c("#ece7f2", "#a6bddb", "#2b8cbe")
+temp_ggplot <- c("#fee0d2", "#fc9272", "#de2d26")
+rain_ggplot <- c("#deebf7", "#9ecae1", "#3182bd")
 ```
-## Creating maps displaying prevision and skill shapefiles through tmap package
+### MONTHLY MAPS ###
 
+Continuous indicators only
 We create one shapefile per month from each raster layer extraction
 
 ```{r}
@@ -69,20 +81,23 @@ pushViewport(viewport(layout = page.layout))
 for (m in 1:ndimT){
  
   ### we build the shapefile of most likely tercile 
-  sp_score <- rasterToPolygons(stacky[[2+3*(m-1)]]) 
-  names(sp_score) <- "Anomaly.Correlation.Coefficient"
+  sp_score <- rasterToPolygons(stacky_mois[[2+3*(m-1)]]) 
+  names(sp_score) <- "MSESS"
   shp_score[[m]] <- st_as_sf(sp_score)
 
   ### we build the shapefile of most likely tercile 
-  sp_sign <- rasterToPolygons(stacky[[3+3*(m-1)]])
+  sp_sign <- rasterToPolygons(stacky_mois[[3+3*(m-1)]])
   names(sp_sign) <- "significance"
   sp_sign$significance[which(sp_sign$significance==0)] <- NA # to help plotting
   shp_sign[[m]] <- st_as_sf(sp_sign)
 
   ### mapping
-  titre <- paste0(ind_eng[ind]," ","score on"," ", moi[m])
+  titre <- paste0(ind_eng[ind]," ","MSESS on"," ", moi[m])
   
-  maprev [[m]]<- qtm(shp_score[[m]], fill = "Anomaly.Correlation.Coefficient", fill.style="cont", fill.breaks=c(-1, -0.6, -0.2, 0.2, 0.6, 1),  attr.outside = TRUE, borders = NULL, fill.palette = "RdYlGn")+ 
+  maprev [[m]]<- 
+    tm_shape(shp_score[[m]])+
+    tm_fill(col = "MSESS", style="fixed", breaks = c(-Inf, seq(-0.0003, 0.0001, length.out = 10), Inf), 
+            attr.outside = TRUE, borders = NULL, palette = score_palette)+ 
    tm_shape(shp_sign[[m]])+
    tm_symbols(size ="significance", col = "yellow", scale = 0.1)+
  #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
@@ -98,8 +113,10 @@ for (m in 1:ndimT){
 
 }
 
-com_legend <- qtm(shp_score[[m]], fill = "Anomaly.Correlation.Coefficient", fill.style="cont", fill.breaks=c(-1, -0.6, -0.2, 0.2, 0.6, 1),  attr.outside = TRUE, borders = NULL, fill.palette = "RdYlGn")+ 
-     tm_layout(legend.only = TRUE)
+com_legend <- qtm(shp_score[[m]], fill = "MSESS", fill.style="fixed", attr.outside = TRUE, borders = NULL, fill.palette = score_palette,
+                  fill.breaks=c(-Inf, seq(-0.0003, 0.0001, length.out = 10), Inf))+ 
+     tm_layout(legend.only = TRUE)+
+  tmap_options()
 
 print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 
@@ -108,65 +125,38 @@ print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 #   tm_raster()
 
 ```
-## Creating maps displaying prevision and skill shapefiles through ggplot package
+### SEASON MAPS ###
 
-Same process as above
-Issue when multi t plotting
 
 ```{r}
-mappy <- list()
-titre <- paste0(ind_eng[ind]," ACC score")
-grid.newpage()
-page.layout <- grid.layout(nrow = 2, ncol = 3)
-pushViewport(viewport(layout = page.layout))
-
 ### BACKGROUND LOADED FROM GOOGLE
 # key = "AIzaSyCD2-pP0yfM8aC8sjCB4g--CaCcExP6NhU"; "AIzaSyB24WUzCzX1lErLgsVLtio1c7QxLfw1_SA"
 # register_google(key = "AIzaSyB24WUzCzX1lErLgsVLtio1c7QxLfw1_SA")
 # back_map <- get_map(location = c(1.2, 41, 10, 46), maptype = "satellite", source = "google") 
 
-### CREATING SHAPEFILES SPECIFIC TO EACH MONTHS - 1 FOR SCORE 1 FOR VALUE SIGNIFICANCE
-for (m in 1:ndimT){
-  
-  # shapefile of score values
-  sp_score <- rasterToPolygons(stacky[[2+3*(m-1)]]) 
-  names(sp_score) <- "score"
-  shp_score[[m]] <- st_as_sf(sp_score)
+  sp_msess <- rasterToPolygons(stacky_seas[[2]]) 
+  names(sp_msess) <- "msess"
+  shp_msess <- st_as_sf(sp_msess)
 
-  # shapefile of score value significance (wilcoxon test outcome)
-  sp_sign <- rasterToPoints(stacky[[3+3*(m-1)]], spatial = TRUE)
+  # shapefile of prevision confidence
+  sp_sign <- rasterToPoints(stacky_seas[[3]], spatial = TRUE)
   names(sp_sign) <- "significance"
   sp_sign$significance[which(sp_sign$significance==0)] <- NA # to help plotting
-  # sp_test <- as.data.frame(sp_sign)
   sf_test <- st_as_sf(sp_sign)
   sf_nrm <- remove_missing(sf_test)
   
-  sp_si <- rasterToPolygons(stacky[[3+3*(m-1)]])
+  sp_si <- rasterToPolygons(stacky_seas[[3]])
   sp_pt2 <- st_as_sf(sp_si)
   sp_pt <- st_centroid(sp_pt2,byid=TRUE)
   
+  shp_tercile$tercile <- as.factor(shp_tercile$tercile)
 ### OVERLAYING SHAPEFILE ON GOOGLE BACKGROUND MAP
-mappy[[m]] <- ggmap(back_map) + 
-  geom_sf(data = shp_score[[m]], aes(fill = score), inherit.aes = FALSE)+
+ggmap(back_map) + 
+  geom_sf(data = shp_msess, aes(fill = msess), inherit.aes = FALSE, alpha = 0.8)+
   scale_fill_gradient(low = "orange", high = "green")+
   geom_sf(data = sf_nrm, aes(colour = significance), inherit.aes = FALSE, size = 0.02, show.legend = FALSE)+
   scale_colour_gradient(low = "blue", high = "blue")+
-  labs(title = paste0(ind_eng[ind]," ACC score for ", moi[m]))+
+  labs(title = paste0(ind_eng[ind]," season MSESS "))+
   theme(plot.title = element_text(size = 12, hjust = 0, vjust = 1.5))
-
-
-#   if (m<4){
-#   print(mappy[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
-#   }
-#   else {
-#   print(mappy[[m]], vp=viewport(layout.pos.row = 2, layout.pos.col = m-3))
-#   }
-# 
-}
-
-#m <- 2 # to be specified
-#map_multiT <- ggarrange(mappy[[1]], mappy[[2]], mappy[[3]], mappy[[4]], mappy[[5]], mappy[[6]], 
-                       #common.legend = TRUE, labels = moi) + annotate_figure(map_comp, fig.lab = titre) 
-#map_uniT <- mappy[[m]]
 
 ```

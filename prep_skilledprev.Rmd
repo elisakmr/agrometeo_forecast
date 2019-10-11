@@ -9,7 +9,7 @@ library(stats)
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
 
-no_core <- 5
+no_core <- 6
 event <-3
 ```
 

@@ -16,6 +16,7 @@ library(doParallel)
 library(easyVerification)
 no_core <- 6
 e<-3
+nboot <- 500
 ```
 
 ## Transforming continuous arrays 
@@ -25,11 +26,10 @@ Regarding 4 selected events (higher/lower tercile/quintile) reference continuous
 ```{r}
 tictoc::tic()
 
-for (ind in 4:8){
+for (ind in 1:8){
   cl <- makeCluster(no_core)
   registerDoParallel(cl)
-  foreach(b=1:500, .packages=c("tidyverse","easyVerification")) %dopar%  { # loop on bootstrap samples
-    
+  foreach(b=1:nboot, .packages=c("tidyverse","easyVerification")) %dopar%  { # loop on bootstrap samples
     
     nom_ref <- paste0(indic[ind],b,"_ref.RData")
     nom_prev <- paste0(indic[ind],b,"_prev.RData")
@@ -37,7 +37,8 @@ for (ind in 4:8){
     load(file = file.path(dir_data, "extract", nom_ref))
     load(file = file.path(dir_data, "extract", nom_prev))
     
-    # seasonal
+    ## SEASONAL ##
+    
     int_obs <- apply(array_obs[,,],c(1,2), sum)
     int_prev <- apply(array_prev[,,,],c(1,2,3), sum)
     seasbin_ref <- array (NA, dim=c(ngrids,nan,e))
@@ -53,7 +54,8 @@ for (ind in 4:8){
     save(seasprob_ps, file = file.path(dir_data, "extract", nom_prevseas))
     save(seasbin_ref, file = file.path(dir_data, "extract", nom_refseas))
     
-    # monthly
+    ## MONTHLY ##
+    
     if (ind != 3|4|5) { # continuous indicators only
       monthbin_ref <- array (NA, dim=c(ngrids,nan,ndimT,e))
       monthprob_ps <- array (NA, dim=c(ngrids,nan,ndimT,e))

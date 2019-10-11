@@ -1,7 +1,7 @@
 ---
 title: "Deterministic score preparation"
 output: html_document
-8187.36 sec elapsed
+
 ---
 
 ```{r setup, include=FALSE}
@@ -16,6 +16,7 @@ library(iterators)
 library(parallel)
 library(doParallel)
 no_core <- 6
+nboot <- 500
 
 ```
 
@@ -29,9 +30,7 @@ for (ind in 1:8){
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
-foreach(b=1:500, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
-
-
+foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
   
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
   nom_prev <- paste0(indic[ind],b,"_prev.RData")

@@ -15,6 +15,7 @@ library(iterators)
 library(parallel)
 library(doParallel)
 no_core <- 6
+nboot <- 500
 ```
 
 ## Loading data aggregated in csv file
@@ -68,7 +69,7 @@ N.B.: 75.78 sec elapsed
 
 # generate random year series
 # rand_year <- list()
-# for (b in 1:500){
+# for (b in 1:nboot){
 #    rand_year[[b]] <- sample(1:nan, nan, replace = TRUE) 
 #  }
 #  save(rand_year, file = file.path(dir_data, "extract", "years.RData"))
@@ -78,7 +79,7 @@ run <- unique(clim_data[,"climatscenario"]) # ensemble members (same for climato
 nrun <- length(run) # count of ens members - ignoring 0 set for reference only
 
 tictoc::tic() 
-for (ind in 2:8){
+for (ind in 1:8){
 
  # indicator type filtering
     indic_data <- raw_data %>% 
@@ -101,7 +102,7 @@ for (ind in 2:8){
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 
-foreach(b=1:500, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
+foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
   array_obs <- array(NA, dim=c(ngrids, nan, ndimT))
   array_prev <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
   array_clim <- array(NA, dim=c(ngrids, nan, nrun, ndimT))

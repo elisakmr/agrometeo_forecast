@@ -38,11 +38,11 @@ For each indicator:
 
 ```{r}
 
-for (ind in 1:8){
+for (ind in 6:8){
     
-      score_ps <- array(NA, dim=c(ngrids, event, 1000)) 
+      score_ps <- array(NA, dim=c(ngrids, event, nboot)) 
   
-    for (b in 1:500)  { 
+    for (b in 1:nboot)  { 
       
       nom_prev <- paste0(indic[ind], b,"scoreprobseason_grid_prev.RData")
   
@@ -95,14 +95,14 @@ for (ind in 1:8){
   ext_prev <- extent(ras_prev)
   mask.raster <- raster(resolution=c(0.1,0.072), crs = "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0", ## !!!!!!!!!!!
                           ext = ext_prev)
-  ras_prev_complete <- rasterize(shp_prob, mask.raster)
+  ras_season <- rasterize(shp_prob, mask.raster)
 
   
   title <- paste0(indic[ind],"_seasonprobsign.tif")
-  writeRaster(stacky, filename=file.path(dir_plot, "season_raster", title), overwrite = TRUE)
+  writeRaster(ras_season, filename=file.path(dir_plot, "season_raster", title), overwrite = TRUE)
 } 
 
-layername <- names(stacky)
+layername <- names(ras_season)
 save(layername, file = file.path(dir_plot, "season_raster", "probseas_layname.RData"))
 
 ```
