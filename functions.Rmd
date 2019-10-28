@@ -27,7 +27,6 @@ qmid_obs<-vector()
 quant_inf_obs <- vector()
 quant_sup_obs <- vector()
 
-
   if(type=="prev"){
     #x <- as.data.frame(x)
     for (year in 1:nban){

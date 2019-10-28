@@ -39,23 +39,24 @@ For each indicator:
 
 ```{r}
 
-for (ind in 1:2){
+for (ind in 6:8){
   
     for (y in 1:nan){
     #---------------------------------------------------------------------------------------------------------------------------------------------
       ## we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
-      
-      # bootstrap iteration index of the year selected
+
+       # bootstrap iteration index of the year selected
     load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
-    
-    list_match <- lapply(rand_year, function(x) grep(y, x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
-    
-    y_index <- list_match[[1]] # year index within the bootstrap iteration
-    b_index <- 1 # bootstrap iteration index
-    for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
-      if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
-      else {y_index <- y_index; b_index <- b_index}
-    }
+     
+    list_match <- lapply(rand_year, function(x) which(y == x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+     
+     y_index <- list_match[[1]] # year index within the bootstrap iteration
+     b_index <- 1 # bootstrap iteration index
+     for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
+       if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+       else {y_index <- y_index; b_index <- b_index}
+     }
+     
     
     #---------------------------------------------------------------------------------------------------------------------------------------------
     ## loading dataframe of prevision with associated coordinates
@@ -122,17 +123,17 @@ for (ind in 1:8){
     #---------------------------------------------------------------------------------------------------------------------------------------------
       ## we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
       
-    #   # bootstrap iteration index of the year selected
-    # load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
-    # 
-    # list_match <- lapply(rand_year, function(x) grep(y, x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
-    # 
-    # y_index <- list_match[[1]] # year index within the bootstrap iteration
-    # b_index <- 1 # bootstrap iteration index
-    # for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
-    #   if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
-    #   else {y_index <- y_index; b_index <- b_index}
-    # }
+       # bootstrap iteration index of the year selected
+    load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+     
+    list_match <- lapply(rand_year, function(x) which(y == x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+     
+     y_index <- list_match[[1]] # year index within the bootstrap iteration
+     b_index <- 1 # bootstrap iteration index
+     for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
+       if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+       else {y_index <- y_index; b_index <- b_index}
+     }
     
     #---------------------------------------------------------------------------------------------------------------------------------------------
     ## loading dataframe of prevision with associated coordinates

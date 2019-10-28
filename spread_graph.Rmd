@@ -18,79 +18,118 @@ library(raster)
 library(rgdal)
 library(tmap)
 library(sf)
+library(s2dverification)
 
+nboot <-500
 ```
 
 
-## Loading files
+## Parameter setting
 
 We load extracted indicator values, depending on indicator picked (to be specified just below).
 
 ```{r file loading}
 # parameter specification
-ind <- 8 # indicator
-
-# file loading
-nom_ref <- paste0(indic[ind],b,"_ref.RData")
-nom_prev <- paste0(indic[ind],b,"_prev.RData")
-nom_clim <- paste0(indic[ind],b,"_clim.RData")
-nom_av_clim <- paste0(indic[ind],b,"_ensmean_clim.RData")
-nom_av_prev <- paste0(indic[ind],b,"_ensmean_prev.RData")
-
-load(file = file.path(dir_data, "extract", nom_ref))
-load(file = file.path(dir_data, "extract", nom_prev))
-load(file = file.path(dir_data, "extract", nom_clim))
-load(file = file.path(dir_data, "extract", nom_av_clim))
-load(file = file.path(dir_data, "extract", nom_av_prev))
-
+ind <- 2 # indicator
 ```
-## Ensemble variance 
+## Retrieving original data set
 
-We compute and plot seasonal yearly ensemble variance for prevision and climatology.
+we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
 
 ```{r }
-### data preparation: computing yearly seasonal ensemble variance for prevision and climatology
-df_value <- data.frame()
-for (y in 1:nan){
-  clim_values <- apply(array_clim[,y,,],1, mean) # seasonal ensemble averaging
-  prev_values <- apply(array_prev[,y,,],1, mean) # seasonal ensemble averaging
+
+ps_original <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
+ref_original <- array(NA, dim=c(ngrids, nan, ndimT))
+
+ for (y in 1:nan){
+
+       # bootstrap iteration index of the year selected
+    load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+     
+    list_match <- lapply(rand_year, function(x) which(y == x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+     
+     y_index <- list_match[[1]] # year index within the bootstrap iteration
+     b_index <- 1 # bootstrap iteration index
+     for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
+       if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+       else {y_index <- y_index; b_index <- b_index}
+     }
+     
+  nom_prev <- paste0(indic[ind],b_index,"_prev.RData")
+  load(file = file.path(dir_data, "extract", nom_prev))
+  ps_original[,y,,] <- array_prev[,y_index[1],,]
   
-  var_prev <- mean(var(prev_values))
-  var_clim <- mean(var(clim_values))
-  
-  df_value <- rbind(df_value, data.frame(type = "prevision", year=an[y], value = var_prev))
-  df_value <- rbind(df_value, data.frame(type = "climato", year=an[y], value = var_clim))
+  nom_ref <- paste0(indic[ind],b_index,"_ref.RData")
+  load(file = file.path(dir_data, "extract", nom_ref))
+  ref_original[,y,] <- array_obs[,y_index[1],]
 }
+
+```
+## Spatial standard deviation - monthly
+
+
+```{r }
+
+### CONTINUOUS INDICATORS ###
+
+  # parameters #
+month <- 3
+#########
+
+spread_ps <- vector()
+spread_ref <- vector()
+df_month <- data.frame()
+
+for (y in 1:nan){
+
+  sd_ps <- Spread(ps_original[,y,,month], posdim = c(1,2), narm = TRUE, conf = FALSE)$sd
+  sd_ref <- sd(ref_original[,y,month])
+  df_month <- rbind(df_month, data.frame(type = "prevision", year=an[y], value = sd_ps))
+  df_month <- rbind(df_month, data.frame(type = "ref", year=an[y], value = sd_ref))
+
+}
+
 ### buidling up graph   
-  ggplot(df_value, aes(factor(year), value)) + geom_point(aes(fill=type, colour =type))+
-  labs(title = paste0(indic[ind], " variance spread"), x="Year", y= "Variance")
+  ggplot(df_month, aes(factor(year), value)) + geom_point(aes(fill=type, colour =type))+
+  labs(title = paste0(indic[ind], " standard deviation lead time ", month), x="Year", y= "Sd")+
+    theme_light()
   
+# inter <- df_value %>% filter(type=="prevision")
+# length(unique(inter[,3]))
 
+  
 ```
-## Ensemble anomaly spread
-
-We compute anomaly for prevision and climatology, following cross validation scheme: considered year is excluded from reference mean.
+## Spatial standard deviation - season
+attention: faire un apply mean pour indicateurs non cumulatifs
 
 ```{r }
-### COMPUTING CROSS VALIDATED ANOMALY  ------------------------------------------------------------------------
-df_value <- data.frame()
-clim_seasmean <- apply(clim_mean[,,],c(1,2), mean) # seasonal averaging from array i*y*t
-prev_seasmean <- apply(prev_mean[,,],c(1,2), mean) # seasonal averaging
+
+### CONTINUOUS AND DISCRETE INDICATORS ###
+### attention: faire un apply mean pour indicateurs non cumulatifs
+
+spread_ps <- vector()
+spread_ref <- vector()
+df_seas <- data.frame()
+
+ps_season <- apply(ps_original, c(1,2,3), mean)
+ref_season <- apply(ref_original, c(1,2), mean)
 
 for (y in 1:nan){
-  ref_seasmean <- apply(array_obs[,-y,],c(1), mean) # average over season + years, omitting year y for crossval scheme
-  ps_seasmean <- apply(array_prev[,-y,,],c(1), mean) # average over season + years, omitting year y for crossval scheme
-  anomaly_ps <- prev_seasmean[,y] - ps_seasmean
-  anomaly_clim <- clim_seasmean[,y] - ref_seasmean
-  anomaly_ref <- apply(array_obs[,y,],1,mean) - ref_seasmean
-  df_value <- rbind(df_value, data.frame(type = "model", year=an[y], value = anomaly_ps))
-  df_value <- rbind(df_value, data.frame(type = "ref", year=an[y], value = anomaly_ref))
+
+  sd_ps <- Spread(ps_season[,y,], posdim = c(1,2), narm = TRUE, conf = FALSE)$sd
+  sd_ref <- sd(ref_season[,y])
+  df_seas <- rbind(df_seas, data.frame(type = "prevision", year=an[y], value = sd_ps))
+  df_seas <- rbind(df_seas, data.frame(type = "ref", year=an[y], value = sd_ref))
 
 }
-  
-### YEARLY BOXPLOTS  ------------------------------------------------------------------------
-  ggplot(df_value, aes(factor(year), value)) + geom_boxplot(aes(fill=type))+
-  labs(title = paste0(indic[ind], " anomaly spread"), x="Year", y= "Indicator value")
-  
 
+### buidling up graph   
+  ggplot(df_seas, aes(factor(year), value)) + geom_point(aes(fill=type, colour =type))+
+  labs(title = paste0(indic[ind], " seasonal standard deviation"), x="Year", y= "Sd")+
+    theme_light()
+  
+# inter <- df_value %>% filter(type=="prevision")
+# length(unique(inter[,3]))
+  
+  
 ```

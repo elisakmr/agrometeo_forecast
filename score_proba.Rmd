@@ -17,8 +17,10 @@ library(foreach)
 library(iterators)
 library(parallel)
 library(doParallel)
+library(readr)
+library(purrr)
 no_core <- 6
-e<-2
+
 nboot <- 500
 
 ```
@@ -42,51 +44,58 @@ Aggregation computed using latitude weighting
 tictoc::tic()
 
 for (ind in 1:8){
-  # monthly
-  scor_mont <- list()
-  for (t in 1: ndimT){
-    list_event <- list()
-    for (e in 1:6){ #LT,MT,HT//LQ,MQ,HQ
-      vect_boot <- vector()
-      for(b in 1:nboot){
-
-      nom_ref <- paste0(indic[ind],b,"_bin_obs.RData")
-      nom_prev <- paste0(indic[ind],b,"_prob_prev.RData")
-     
+  list_boot1 <- list()
+  list_boot2 <- list()
+  list_event1 <- list()
+  
+  for (e in 1:3){ #LT,MT,HT
+    
+    for (b in 1:nboot){
+    nom_prevseas <- paste0(indic[ind],b,"_seasprob_prev.RData")
+    nom_refseas <- paste0(indic[ind],b,"_seasbin_obs.RData")
+    load(file = file.path(dir_data, "extract", nom_prevseas))
+    load(file = file.path(dir_data, "extract", nom_refseas))
+    
+    if (ind!=3 & ind!=4 & ind!=5) { # monthly
+      nom_ref <- paste0(indic[ind],b,"_monthbin_obs.RData")
+      nom_prev <- paste0(indic[ind],b,"_monthprob_prev.RData")
       load(file = file.path(dir_data, "extract", nom_ref))
       load(file = file.path(dir_data, "extract", nom_prev))
-    
-      vect_boot[[b]] <- score_boite_prob(prob_ps, bin_ref, t, lati[,1], nb_bin = 5, e)$AUC
-      }
       
-    list_event[[e]] <- vect_boot
+      for (t in 1: ndimT){
+         vect_month[t] <- score_boite_prob(monthprob_ps[,,t,], monthbin_ref[,,t,], lati[,1], nb_bin = 5, e)$AUC
+       }
+
     }
+
+     if (ind!=3 & ind!=4 & ind!=5) { # monthly
+       vect_month <- vector()
+       
+     list_event1[[e]] <- vect_month
+     }
+
     
-  scor_mont[[t]] <- list_event
+
+   
+    vect_event2[e] <- score_boite_prob(seasprob_ps, seasbin_ref, lati[,1], nb_bin = 5, e)$AUC # seasonal 
+
+   }
+  
+  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+  list_boot1[[b]] <- list_event1 # monthtly 
   }
   
-  nom_ps <- paste0(indic[ind],"scorprob_box.RData")
-  save(scor_mont, file = file.path(dir_data, "score", nom_ps))
-
-  # seasonal 
-  score_event <- list()
-  for (e in 1:3){ #LT,MT,HT//LQ,MQ,HQ
-      vect_boot <- vector()
-      for(b in 1:nboot){
-
-      nom_prevseas <- paste0(indic[ind],b,"_seasprob_prev.RData")
-      nom_refseas <- paste0(indic[ind],b,"_seasbin_obs.RData")
-      load(file = file.path(dir_data, "extract", nom_prevseas))
-      load(file = file.path(dir_data, "extract", nom_refseas))
-    
-      vect_boot[[b]] <- score_boite_prob(prob_ps, bin_ref, lati[,1], nb_bin = 5, e)$AUC
-      }
-      
-    score_event[[e]] <- vect_boot
- }
+  list_boot2[[b]] <- vect_event2 # seasonal 
   
-  nom_ps <- paste0(indic[ind],"seasprobscor_box.RData")
-  save(scor_mont, file = file.path(dir_data, "score", nom_ps))
+  }
+ 
+  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+  nom_month <- paste0(indic[ind],"boxprob_month.RData")
+  save(list_boot1, file = file.path(dir_data, "score", nom_month))
+  }
+  
+  nom_seas <- paste0(indic[ind],"boxprob_seas.RData")
+  save(list_boot2, file = file.path(dir_data, "score", nom_seas))
 
 }
 
@@ -100,25 +109,34 @@ Transform lists in a more handy format
 ```{r}
 
 for (ind in 1:8){
-  nom_ps <- paste0(indic[ind],"scorprob_box.RData")
+  
+   # season
+  nom_ps <- paste0(indic[ind],"boxprob_seas.RData")
   load(file = file.path(dir_data, "score", nom_ps))
-
-  sum_df <- matrix(ncol = ndimT, nrow = 6)
   
-  for (t in 1: ndimT){
-    for (e in 1:6){ #LT,MT,HT//LQ,MQ,HQ
-    sum_df[t,e] <- mean(scor_mont[[t]][[e]])
+  #int_matrix <- array(unlist(list_boot2) , c(nboot,3))
+  #sum_seas <- apply(int_matrix, 2, mean, na.rm=T)
+  #sum_seas <- Reduce("+", list_boot2)/nboot
+  array_seas <- na.omit(array(unlist(list_boot2) , c(3,nboot)))
+  sum_seas <- apply(array_seas, 1, mean) 
+  
+  nom_seas <- paste0(indic[ind],"avboxprob_seas.csv")
+  write_csv(as.data.frame(sum_seas), file.path(dir_data, "score", nom_seas))
 
-    }
+  # month
+  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+    nom_ps <- paste0(indic[ind],"boxprob_month.RData")
+    load(file = file.path(dir_data, "score", nom_ps))
+
+    sum_month <- apply(array(unlist(list_boot1) , c(6,3,nboot)), c(1,2), mean)
+    
+  colnames(sum_month) <- c("LT","MT","HT")
+  nom_month <- paste0(indic[ind],"avboxprob_month.csv")
+  write_csv(as.data.frame(sum_month), file.path(dir_data, "score", nom_month))
+
   }
-  
-  colnames(sum_df) <- c("LT","MT","HT","LQ","MQ","HQ")
-  nom_ps <- paste0(indic[ind],"scorprob_boxav.csv")
-  write_csv(as.data.frame(sum_df), file.path(dir_data, "score", nom_ps))
-}
 
-nom_ps <- paste0(indic[ind],"scorprob_boxav.csv")
-load(file = file.path(dir_data, "score", nom_ps))
+}
 
 ```
 

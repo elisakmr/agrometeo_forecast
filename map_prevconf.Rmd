@@ -30,7 +30,7 @@ Region of interest
 select_year <- 2000
 moi <- c("May","June","July","August","September","October","November")
 annees <- c(1993:2016)
-ind <- 4
+ind <- 8
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -94,16 +94,15 @@ for (m in 1:ndimT){
   names(sp_conf) <- "confidence"
   sp_conf$confidence[which(sp_conf$confidence==0)] <- NA # to help plotting
   shp_conf[[m]] <- st_as_sf(sp_conf)
-  
    
 #    1st tercile = lower tercile; 2nd = middle; 3rd = upper
   
   ### mapping
   titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
   maprev [[m]]<- qtm(shp_tercile[[m]], fill = "tercile",
-     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4),fill.palette = rain_palette, legend.fill.show=FALSE)+ 
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4),fill.palette = temp_palette, legend.fill.show=FALSE)+ 
  tm_shape(shp_conf[[m]])+
-   tm_symbols(size ="confidence", col = "yellow", scale = 0.1)+
+   tm_symbols(size ="confidence", col = "yellow", scale = 0.01)+
  #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
  #tm_scale_bar()+
  #tm_add_legend(type = "fill", labels = c("3rd tercile","2nd tercile","1st tercile"), col =  c("dodgerblue3","lightgrey","darkslategray2"), alpha = 0.5)+
@@ -119,7 +118,7 @@ for (m in 1:ndimT){
 }
 #fill.style="fixed",fill.breaks=c(1,2,3,4), 
 com_legend <- qtm(shp_tercile[[m]], fill = "tercile",
-     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4),fill.palette = rain_palette)+  
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4),fill.palette = temp_palette)+  
      tm_layout(legend.only = TRUE)
 
 print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))

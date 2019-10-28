@@ -30,7 +30,7 @@ Region of interest
 
 ```{r}
 moi <- c("May","June","July","August","September","October","November")
-ind <- 2
+ind <- 4
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -57,9 +57,10 @@ load(file = file.path(dir_plot, "season_raster", "layname_detseas.RData")) # loa
 names(stacky_seas) <- c(layername)# re setting original layer names
 
 score_palette <- c("#ca0020","#f4a582","#f7f7f7","#92c5de","#0571b0")
-rain_palette <- c("#ece7f2", "#a6bddb", "#2b8cbe")
-temp_ggplot <- c("#fee0d2", "#fc9272", "#de2d26")
-rain_ggplot <- c("#deebf7", "#9ecae1", "#3182bd")
+large_breaks <- c(-3e-04, 3e-04)
+rain_breaks <- c(-0.01, 0.01)
+temp_breaks <- c(-0.0003, 0.0003)
+day25 <- c(-0.0015, 0.0015)
 ```
 ### MONTHLY MAPS ###
 
@@ -79,43 +80,43 @@ pushViewport(viewport(layout = page.layout))
 
 
 for (m in 1:ndimT){
- 
+  
   ### we build the shapefile of most likely tercile 
   sp_score <- rasterToPolygons(stacky_mois[[2+3*(m-1)]]) 
   names(sp_score) <- "MSESS"
   shp_score[[m]] <- st_as_sf(sp_score)
-
+  
   ### we build the shapefile of most likely tercile 
   sp_sign <- rasterToPolygons(stacky_mois[[3+3*(m-1)]])
   names(sp_sign) <- "significance"
   sp_sign$significance[which(sp_sign$significance==0)] <- NA # to help plotting
   shp_sign[[m]] <- st_as_sf(sp_sign)
-
+  
   ### mapping
   titre <- paste0(ind_eng[ind]," ","MSESS on"," ", moi[m])
   
   maprev [[m]]<- 
     tm_shape(shp_score[[m]])+
-    tm_fill(col = "MSESS", style="fixed", breaks = c(-Inf, seq(-0.0003, 0.0001, length.out = 10), Inf), 
+    tm_fill(col = "MSESS", style="cont", breaks = seq(-3e-04, 3e-04, length.out = 5), 
             attr.outside = TRUE, borders = NULL, palette = score_palette)+ 
-   tm_shape(shp_sign[[m]])+
-   tm_symbols(size ="significance", col = "yellow", scale = 0.1)+
- #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
- #tm_scale_bar()+
-     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
-
-   if (m<4){
-  print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
+    tm_shape(shp_sign[[m]])+
+    tm_symbols(size ="significance", col = "yellow", scale = 0.05)+
+    #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+    #tm_scale_bar()+
+    tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
+  
+  if (m<4){
+    print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
   }
   else {
-  print(maprev[[m]], vp=viewport(layout.pos.row = 2, layout.pos.col = m-3))
+    print(maprev[[m]], vp=viewport(layout.pos.row = 2, layout.pos.col = m-3))
   }
-
+  
 }
 
-com_legend <- qtm(shp_score[[m]], fill = "MSESS", fill.style="fixed", attr.outside = TRUE, borders = NULL, fill.palette = score_palette,
-                  fill.breaks=c(-Inf, seq(-0.0003, 0.0001, length.out = 10), Inf))+ 
-     tm_layout(legend.only = TRUE)+
+com_legend <- qtm(shp_score[[m]], fill = "MSESS", fill.style="cont", attr.outside = TRUE, borders = NULL, fill.palette = score_palette,
+                  fill.breaks = seq(-3e-04, 3e-04, length.out = 5))+ 
+  tm_layout(legend.only = TRUE)+
   tmap_options()
 
 print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
@@ -151,11 +152,11 @@ print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
   
   shp_tercile$tercile <- as.factor(shp_tercile$tercile)
 ### OVERLAYING SHAPEFILE ON GOOGLE BACKGROUND MAP
-ggmap(back_map) + 
-  geom_sf(data = shp_msess, aes(fill = msess), inherit.aes = FALSE, alpha = 0.8)+
-  scale_fill_gradient(low = "orange", high = "green")+
+ggmap(back_map) +
+  geom_sf(data = shp_msess, aes(fill = msess), inherit.aes = FALSE, alpha = 1)+
+  continuous_scale(aesthetics = "msess", scale_name = "manual", palette = 0.1)+
+  scale_fill_gradientn(colours=score_palette, limits = day25)+ 
   geom_sf(data = sf_nrm, aes(colour = significance), inherit.aes = FALSE, size = 0.02, show.legend = FALSE)+
-  scale_colour_gradient(low = "blue", high = "blue")+
   labs(title = paste0(ind_eng[ind]," season MSESS "))+
   theme(plot.title = element_text(size = 12, hjust = 0, vjust = 1.5))
 
