@@ -9,6 +9,8 @@ dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
 library(s2dverification)
 library(stats)
 library(s2dverification)
+library(ggplot2)
+library(CSTools)
 
 ```
 
@@ -17,6 +19,8 @@ library(s2dverification)
 we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
 
 ```{r }
+
+ind <- 2
 
 ps_original <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
 ref_original <- array(NA, dim=c(ngrids, nan, ndimT))
@@ -47,6 +51,8 @@ ref_original <- array(NA, dim=c(ngrids, nan, ndimT))
 ```
 ## Plotting seasonal prevision and observation
 
+Attention sum ou mean selon indicateur!
+
 ```{r }
 
 ps_season_int <- apply(ps_original, c(1,2,3), sum)
@@ -66,5 +72,38 @@ ggplot(df_raw, aes(x=year, y=value,  fill=type)) + geom_bar(stat = "identity", p
   labs(title = paste0(indic[ind], " seasonal aggregation"), x="Year", y= "Value")+
       theme_bw()
 
+# calculating mean differences
+df_raw %>% group_by(type) %>% summarise(mean_ps=mean(value))
 
 ```
+## Plotting probability density functions
+
+Attention sum ou mean selon indicateur!
+sur ts grids
+picked indicator: cum rain
+picked year: y
+ps ensemble mean vs ref: 541 valeurs each (ngrids)
+tercile from ref with all grids*all years 
+
+```{r }
+  ## parameters ##
+y <- 1
+
+  ## plot ## 
+
+ps_season_int <- apply(ps_original, c(1,2,3), sum)
+ps_season <- apply(ps_season_int, c(1,2), mean)
+ref_season_int <- apply(ref_original, c(1,2), sum)
+ref_season <- apply(ref_season_int, c(1,2), mean)
+tercile_bound <- as.numeric(quantile(ref_season, prob = 1:2/3))
+
+test_df <- as.data.frame(cbind(ps_season[,y],ref_season[,y]))
+colnames(test_df) <- c("prevision","ref")
+PlotForecastPDF(test_df,tercile_bound, add.ensmemb = 'no', var.name = paste0(indic[ind],"(mm)"),title = paste0(indic[ind]," year ", an[y]))
+
+
+```
+
+
+
+

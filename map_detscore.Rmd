@@ -4,8 +4,10 @@ output: html_document
 ---
 
 ```{r}
+
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
 library(maps)
 library(maptools)
 library(tmaptools)
@@ -30,7 +32,7 @@ Region of interest
 
 ```{r}
 moi <- c("May","June","July","August","September","October","November")
-ind <- 4
+ind <- 8
 
 ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
              "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
@@ -48,19 +50,16 @@ stacky_seas <- stack(file.path(dir_plot, "season_raster", title)) # loading stac
 if (ind!=3 & ind!=4 & ind!=5) { 
   title <- paste0(indic[ind],"_detmonth",".tif")
   stacky_mois <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+  load(file = file.path(dir_plot, "season_raster", "layname_detmonth.RData")) # loading stack layer names before     writeraster changed them
+  names(stacky_mois) <- c(layername)# re setting original layer names
+
 }
 
-load(file = file.path(dir_plot, "season_raster", "layname_detmonth.RData")) # loading stack layer names before writeraster changed them
-names(stacky_mois) <- c(layername)# re setting original layer names
 
 load(file = file.path(dir_plot, "season_raster", "layname_detseas.RData")) # loading stack layer names before writeraster changed them
 names(stacky_seas) <- c(layername)# re setting original layer names
 
 score_palette <- c("#ca0020","#f4a582","#f7f7f7","#92c5de","#0571b0")
-large_breaks <- c(-3e-04, 3e-04)
-rain_breaks <- c(-0.01, 0.01)
-temp_breaks <- c(-0.0003, 0.0003)
-day25 <- c(-0.0015, 0.0015)
 ```
 ### MONTHLY MAPS ###
 
@@ -68,6 +67,11 @@ Continuous indicators only
 We create one shapefile per month from each raster layer extraction
 
 ```{r}
+large_breaks <- c(-3e-04, 3e-04)
+rain_breaks <- c(-0.01, 0.01)
+temp_breaks <- c(-0.0003, 0.0003)
+day25 <- c(-0.0015, 0.0015)
+drain <- c(-0.002, 0.002)
 
 ## CREATING SHAPEFILE TO BE PLOTTED BY EXTRACTING RASTER LAYER + FACET DISPLAYING 
 tmap_mode('plot')
@@ -97,7 +101,7 @@ for (m in 1:ndimT){
   
   maprev [[m]]<- 
     tm_shape(shp_score[[m]])+
-    tm_fill(col = "MSESS", style="cont", breaks = seq(-3e-04, 3e-04, length.out = 5), 
+    tm_fill(col = "MSESS", style="cont", breaks = seq(-3e-04, 3e-04, length.out = 8), 
             attr.outside = TRUE, borders = NULL, palette = score_palette)+ 
     tm_shape(shp_sign[[m]])+
     tm_symbols(size ="significance", col = "yellow", scale = 0.05)+
@@ -115,7 +119,7 @@ for (m in 1:ndimT){
 }
 
 com_legend <- qtm(shp_score[[m]], fill = "MSESS", fill.style="cont", attr.outside = TRUE, borders = NULL, fill.palette = score_palette,
-                  fill.breaks = seq(-3e-04, 3e-04, length.out = 5))+ 
+                  fill.breaks = seq(-3e-04, 3e-04, length.out = 8))+ 
   tm_layout(legend.only = TRUE)+
   tmap_options()
 
@@ -130,6 +134,12 @@ print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 
 
 ```{r}
+large_breaks <- c(-3e-04, 3e-04)
+rain_breaks <- c(-0.01, 0.01)
+temp_breaks <- c(-0.0003, 0.0003)
+day25 <- c(-0.0015, 0.0015)
+drain <- c(-0.005, 0.005)
+
 ### BACKGROUND LOADED FROM GOOGLE
 # key = "AIzaSyCD2-pP0yfM8aC8sjCB4g--CaCcExP6NhU"; "AIzaSyB24WUzCzX1lErLgsVLtio1c7QxLfw1_SA"
 # register_google(key = "AIzaSyB24WUzCzX1lErLgsVLtio1c7QxLfw1_SA")
@@ -155,7 +165,7 @@ print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
 ggmap(back_map) +
   geom_sf(data = shp_msess, aes(fill = msess), inherit.aes = FALSE, alpha = 1)+
   continuous_scale(aesthetics = "msess", scale_name = "manual", palette = 0.1)+
-  scale_fill_gradientn(colours=score_palette, limits = day25)+ 
+  scale_fill_gradientn(colours=score_palette, limits = temp_breaks)+ #
   geom_sf(data = sf_nrm, aes(colour = significance), inherit.aes = FALSE, size = 0.02, show.legend = FALSE)+
   labs(title = paste0(ind_eng[ind]," season MSESS "))+
   theme(plot.title = element_text(size = 12, hjust = 0, vjust = 1.5))

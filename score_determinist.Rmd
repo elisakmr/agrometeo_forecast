@@ -137,7 +137,7 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
   save(det_month, file = file.path(dir_data, "score", nom_prevmonth))
   save(det_seas, file = file.path(dir_data, "score", nom_prevseas))
 
-  gc(TRUE)
+  #gc(TRUE)
 
 }
 stopCluster(cl)

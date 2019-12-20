@@ -111,21 +111,21 @@ spread_ps <- vector()
 spread_ref <- vector()
 df_seas <- data.frame()
 
-ps_season <- apply(ps_original, c(1,2,3), mean)
-ref_season <- apply(ref_original, c(1,2), mean)
+ps_season <- apply(ps_original, c(1,2,3), sum)
+ref_season <- apply(ref_original, c(1,2), sum)
 
 for (y in 1:nan){
 
-  sd_ps <- Spread(ps_season[,y,], posdim = c(1,2), narm = TRUE, conf = FALSE)$sd
-  sd_ref <- sd(ref_season[,y])
-  df_seas <- rbind(df_seas, data.frame(type = "prevision", year=an[y], value = sd_ps))
-  df_seas <- rbind(df_seas, data.frame(type = "ref", year=an[y], value = sd_ref))
+  var_ps <- Spread(ps_season[,y,], posdim = c(1,2), narm = TRUE, conf = FALSE)$sd/mean(ps_season[,y,])
+  var_ref <- sd(ref_season[,y])/mean(ref_season[,y])
+  df_seas <- rbind(df_seas, data.frame(type = "prevision", year=an[y], value = var_ps))
+  df_seas <- rbind(df_seas, data.frame(type = "ref", year=an[y], value = var_ref))
 
 }
 
 ### buidling up graph   
   ggplot(df_seas, aes(factor(year), value)) + geom_point(aes(fill=type, colour =type))+
-  labs(title = paste0(indic[ind], " seasonal standard deviation"), x="Year", y= "Sd")+
+  labs(title = paste0(indic[ind], " seasonal variation coefficient"), x="Year", y= "Coef")+
     theme_light()
   
 # inter <- df_value %>% filter(type=="prevision")

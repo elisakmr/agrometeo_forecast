@@ -1,0 +1,153 @@
+---
+title: "map_prevconf"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+library(mapview)
+library(grid)
+library(ggnewscale)
+
+```
+## Parameter specifications
+
+Indicator to be displayed
+Month
+Region of interest
+
+```{r}
+select_year <- 2003
+moi <- c("May","June","July","August","September","October","November")
+ind <- 2
+
+ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
+             "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
+ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy days","Number of days T max > 25°C", 
+             "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
+palette_terc1 <- c("#c7eae5","#abd9e9","#2166ac")
+palette_terc3 <- c("#fde0ef","#f4a582","#b2182b")
+
+```
+## Loading raster
+
+Specific to indicator and year of prevision
+
+```{r}
+
+title <- paste0(indic[ind],"_confprevseas", select_year,".tif")
+stacky_seas <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+
+if (ind!=3 & ind!=4 & ind!=5) { 
+  title <- paste0(indic[ind],"_confprevmonth", select_year,".tif")
+  stacky_mois <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+}
+
+load(file = file.path(dir_plot, "season_raster", "layname_confprevmonth.RData")) # loading stack layer names before writeraster changed them
+names(stacky_mois) <- c(layername)# re setting original layer names
+
+load(file = file.path(dir_plot, "season_raster", "layname_confprevseas.RData")) # loading stack layer names before writeraster changed them
+names(stacky_seas) <- c(layername)# re setting original layer names
+
+```
+### MONTHLY MAPS ###
+
+Only for continuous indicators
+Creating maps displaying prevision and confidence shapefiles
+We create one shapefile per month from each raster layer extraction
+
+```{r}
+
+## CREATING SHAPEFILE TO BE PLOTTED BY EXTRACTING RASTER LAYER + FACET DISPLAYING 
+tmap_mode('plot')
+shp_tercile <- list()
+shp_conf <- list()
+maprev <- list()
+grid.newpage()
+page.layout <- grid.layout(nrow = 3, ncol = 3)
+pushViewport(viewport(layout = page.layout))
+
+
+for (m in 1:ndimT){
+ 
+  ### we build the shapefile of most likely tercile 
+  sp_tercile <- rasterToPolygons(stacky_mois[[2+3*(m-1)]]) 
+  names(sp_tercile) <- "tercile"
+  #sp_tercile@data[,1] <- as.character(sp_tercile@data[,1])
+  shp_tercile[[m]] <- st_as_sf(sp_tercile)
+
+  ### we build the shapefile of prevision confidence
+  sp_conf <- rasterToPolygons(stacky_mois[[3+3*(m-1)]])
+  names(sp_conf) <- "confidence"
+  sp_conf$confidence[which(sp_conf$confidence==0)] <- NA # to help plotting
+  shp_conf[[m]] <- st_as_sf(sp_conf)
+   
+#    1st tercile = lower tercile; 2nd = middle; 3rd = upper
+  
+  ### mapping
+  titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
+  maprev [[m]]<- qtm(shp_tercile[[m]], fill = "tercile",
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4),fill.palette = temp_palette, legend.fill.show=FALSE)+ 
+ tm_shape(shp_conf[[m]])+
+   tm_symbols(size ="confidence", col = "yellow", scale = 0.01)+
+ #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+ #tm_scale_bar()+
+ #tm_add_legend(type = "fill", labels = c("3rd tercile","2nd tercile","1st tercile"), col =  c("dodgerblue3","lightgrey","darkslategray2"), alpha = 0.5)+
+     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
+
+   if (m<4){
+  print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
+  }
+  else {
+  print(maprev[[m]], vp=viewport(layout.pos.row = 2, layout.pos.col = m-3))
+  }
+
+}
+#fill.style="fixed",fill.breaks=c(1,2,3,4), 
+com_legend <- qtm(shp_tercile[[m]], fill = "tercile",
+     attr.outside = TRUE,borders = NULL, fill.style="fixed",fill.breaks=c(1,2,3,4),fill.palette = temp_palette)+  
+     tm_layout(legend.only = TRUE)
+
+print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
+
+
+```
+### SEASONAL MAPS ###
+
+Creating maps displaying prevision and confidence shapefiles
+
+
+```{r}
+sp_tercile1 <- rasterToPolygons(stacky_seas[[2]])
+names(sp_tercile1) <- "tercile1"
+sp_tercile1$tercile1[which(sp_tercile1$tercile1==0)] <- NA # to help plotting
+shp_tercile1 <- st_as_sf(sp_tercile1)
+
+sp_tercile3 <- rasterToPolygons(stacky_seas[[3]])
+names(sp_tercile3) <- "tercile3"
+sp_tercile3$tercile3[which(sp_tercile3$tercile3==0)] <- NA # to help plotting
+shp_tercile3 <- st_as_sf(sp_tercile3)
+shp_tercile3 <- remove_missing(shp_tercile3)
+
+ggmap(back_map) +
+   geom_sf(data = shp_tercile1, aes(fill = tercile1), inherit.aes = FALSE, alpha = 0.8)+
+   scale_fill_gradientn(colours=palette_terc1, limits = c(0.45,1))+ #, na.value="lightgrey"
+   new_scale("fill") +
+   geom_sf(data = shp_tercile3, aes(fill = tercile3), inherit.aes = FALSE, alpha = 0.8)+
+   scale_fill_gradientn(colours=palette_terc3, limits = c(0.45,1))+ #, na.value="lightgrey"
+   labs(title = paste0(ind_eng[ind]," season prevision for ",select_year))+
+   theme(plot.title = element_text(size = 12, hjust = 0, vjust = 1.5))
+
+```

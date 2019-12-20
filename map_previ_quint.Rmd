@@ -1,0 +1,91 @@
+---
+title: "Mapping quintile prevision"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+library(mapview)
+library(grid)
+library(ggnewscale)
+library(tidyr)
+
+```
+## Parameter specifications
+
+Indicator to be displayed
+Month
+Region of interest
+
+```{r}
+select_year <- 2001
+moi <- c("May","June","July","August","September","October","November")
+ind <- 2
+
+ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
+             "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
+ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy days","Number of days T max > 25°C", 
+             "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
+
+palette_terc1 <- c("#31a354","#abd9e9","#2166ac")
+palette_terc3 <- c("#fde0ef","#f4a582","#b2182b")
+#palette_terc1 <- c("yellow","pink","red")
+
+```
+## Loading raster
+
+Specific to indicator and year of prevision
+
+```{r}
+
+title <- paste0(indic[ind],"_prevquintseas", select_year,".tif")
+stacky_seas <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+
+load(file = file.path(dir_plot, "season_raster", "layname_prevquint_seas.RData")) # loading stack layer names before writeraster changed them
+names(stacky_seas) <- c(layername)# re setting original layer names
+
+```
+                  
+
+
+                                                              ## SEASON FORECAST ##
+                                                              
+
+Creating maps displaying prevision and confidence shapefiles
+
+
+```{r}
+sp_quint1 <- rasterToPolygons(stacky_seas[[2]])
+names(sp_quint1) <- "quint1"
+sp_quint1$quint1[which(sp_quint1$quint1==0)] <- NA # to help plotting
+shp_quint1 <- st_as_sf(sp_quint1)
+shp_quint1 <- drop_na(shp_quint1)
+
+sp_quint5 <- rasterToPolygons(stacky_seas[[3]])
+names(sp_quint5) <- "quint5"
+sp_quint1$quint1[which(sp_quint5$quint5==0)] <- NA # to help plotting
+shp_quint5 <- st_as_sf(sp_quint5)
+shp_quint5 <- drop_na(shp_quint5)
+
+ggmap(back_map) +
+   geom_sf(data = shp_quint1, aes(fill = quint1), inherit.aes = FALSE, alpha = 0.8)+
+   scale_fill_gradientn(colours=palette_terc1, limits = c(0.2,1))+ #
+   new_scale("fill") +
+   geom_sf(data = shp_quint5, aes(fill = quint5), inherit.aes = FALSE, alpha = 0.8)+
+   scale_fill_gradientn(colours=palette_terc3, limits = c(0.2,1))+ #, na.value="lightgrey"
+   labs(title = paste0(ind_eng[ind]," season prevision for ",select_year))+
+   theme(plot.title = element_text(size = 12, hjust = 0, vjust = 1.5))
+
+```

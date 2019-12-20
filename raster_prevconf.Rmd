@@ -4,8 +4,10 @@ output: html_document
 ---
 
 ```{r}
+
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
 library(maps)
 library(maptools)
 library(rasterVis)
@@ -18,6 +20,7 @@ library(tmap)
 library(sf)
 library(ggmap)
 library(nnet)
+
 nboot <- 500
 
 ```
@@ -28,9 +31,11 @@ nboot <- 500
 
 moi <- c("May","June","July","August","September","October","November")
 annees <- c(1993:2016)
-select_year <- 1995
+
 ```
-## Monthly prevision
+
+## Monthly prevision ##
+
 Building up rasters merging gridded prevision and confidence - indicator and year specific
 For each indicator:
   - We create a conversion-to-raster-ready dataframe containing the most likely tercile and the confidence level (0: conf < 0.5; 1: conf > 0.5).
@@ -39,12 +44,15 @@ For each indicator:
 
 ```{r}
 
+load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+load(file = file.path(dir_data, "extract", "lon.RData"))
+load(file = file.path(dir_data, "extract", "lat.RData"))
+
 for (ind in 6:8){
-  
-    for (y in 1:nan){
+
+   for (y in 1:nan){
     #---------------------------------------------------------------------------------------------------------------------------------------------
       ## we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
-
        # bootstrap iteration index of the year selected
     load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
      
@@ -60,25 +68,18 @@ for (ind in 6:8){
     
     #---------------------------------------------------------------------------------------------------------------------------------------------
     ## loading dataframe of prevision with associated coordinates
-
   nom_ps <- paste0(indic[ind],b_index,"_monthprob_prev.RData")
   load(file = file.path(dir_data, "extract", nom_ps))
-  
-  load(file = file.path(dir_data, "extract", "lon.RData"))
-  load(file = file.path(dir_data, "extract", "lat.RData"))
-  
   ## creating a table containing most likely tercile and its associated confidence level (regarding probability value), with both coordinates (shape ready for shapefile conversion)
 
     ras_prev_complete <- list()
     for (t in 1:ndimT){
       matrix4shp <- matrix(0, nrow = ngrids, ncol = 4)
       for (i in 1:ngrids) {
-        proba <- c(monthprob_ps[i,y_index[1],t,1],monthprob_ps[i,y_index[1],t,2],monthprob_ps[i,y_index[1],t,3]) # proba associated to each tercile 
+        proba <- c(monthprob_ps[i,y_index[1],t,1],monthprob_ps[i,y_index[1],t,3]) # proba associated to each tercile 
         tercile <- which.is.max(proba) # most likely tercile
-        matrix4shp[i,1] <- tercile 
-        
-        if (monthprob_ps[i,y_index[1],t,tercile] > 0.5){ # likely tercile confidence
-        matrix4shp[i,2] <- 1
+        if (proba[tercile] > 0.45){ # likely tercile confidence
+          matrix4shp[i,tercile] <- proba[tercile]
        }
    }
     
@@ -109,13 +110,17 @@ for (ind in 6:8){
 }
 layername <- names(ras_month)
 save(layername, file = file.path(dir_plot, "season_raster", "layname_confprevmonth.RData"))
+
 ```
 
-## Seasonal prevision
+## Seasonal prevision ##
 
 
 
 ```{r}
+
+  load(file = file.path(dir_data, "extract", "lon.RData"))
+  load(file = file.path(dir_data, "extract", "lat.RData"))
 
 for (ind in 1:8){
   
@@ -137,24 +142,19 @@ for (ind in 1:8){
     
     #---------------------------------------------------------------------------------------------------------------------------------------------
     ## loading dataframe of prevision with associated coordinates
-
   nom_ps <- paste0(indic[ind],b_index,"_seasprob_prev.RData")
   load(file = file.path(dir_data, "extract", nom_ps))
-  
-  load(file = file.path(dir_data, "extract", "lon.RData"))
-  load(file = file.path(dir_data, "extract", "lat.RData"))
-  
   ## creating a table containing most likely tercile and its associated confidence level (regarding probability value), with both coordinates (shape ready for shapefile conversion)
 
       matrix4shp <- matrix(0, nrow = ngrids, ncol = 4)
       for (i in 1:ngrids) {
-        proba <- c(seasprob_ps[i,y_index[1],1],seasprob_ps[i,y_index[1],2],seasprob_ps[i,y_index[1],3]) # proba associated to each tercile - warning: we're inverting to have lower tercile 1st
-        tercile <- which.is.max(proba) # most likely tercile
-        matrix4shp[i,1] <- tercile 
-        
-        if (seasprob_ps[i,y_index[1],tercile] > 0.5){ # likely tercile confidence
-        matrix4shp[i,2] <- 1
-       }
+        proba <- c(seasprob_ps[i,y_index[1],1],seasprob_ps[i,y_index[1],3]) 
+        if (length(unique(proba))==2){
+          tercile <- which.is.max(proba) # most likely tercile
+          if (proba[tercile] > 0.45){ # likely tercile confidence
+            matrix4shp[i,tercile] <- proba[tercile]
+          }
+        }
    }
     
     matrix4shp[,3] <- unlist(vect_lat)
@@ -164,7 +164,7 @@ for (ind in 1:8){
     
     # we load the dataframe previously built and transform it into a raster
     df_shp <- data.frame(matrix4shp)
-    colnames(df_shp) <- c("tercile", "confidence","lat","lon")
+    colnames(df_shp) <- c("tercile1", "tercile3","lat","lon")
     coordinates(df_shp) <- ~lon+lat
     proj4string(df_shp) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
     shp_confprev <- st_as_sf(df_shp)

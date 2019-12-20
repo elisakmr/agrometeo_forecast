@@ -22,12 +22,15 @@ nboot <- 500
 ## Transforming continuous arrays 
 
 Regarding 4 selected events (higher/lower tercile/quintile) reference continuous values are transformed into binary values; ensemble prevision values are transformed into probabilistic values (computed from the ensemble spread). 
+we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
+
 
 ```{r}
 tictoc::tic()
 
 for (ind in 1:8){
-  cl <- makeCluster(no_core)
+  
+ cl <- makeCluster(no_core)
   registerDoParallel(cl)
   foreach(b=1:nboot, .packages=c("tidyverse","easyVerification")) %dopar%  { # loop on bootstrap samples
     
@@ -75,8 +78,11 @@ for (ind in 1:8){
     }
     
   }
+  
   stopCluster(cl)
+  
 }
 
 tictoc::toc()
+
 ```

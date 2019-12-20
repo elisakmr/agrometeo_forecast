@@ -1,0 +1,105 @@
+---
+title: "Mapping lower tercile scores"
+output: html_document
+---
+
+```{r}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(maps)
+library(maptools)
+library(rasterVis)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(raster)
+library(rgdal)
+library(tmap)
+library(sf)
+library(ggmap)
+library(mapview)
+library(grid)
+```
+## Parameter specifications
+
+Indicator to be displayed
+Region of interest
+
+```{r}
+moi <- c("May","June","July","August","September","October","November")
+ind <- 1
+
+ind_fr <- c("Pluie – evaporation", "Somme des pluies","Nombre de jours de pluie","Nombre de jours T max > 25°C", 
+             "Nombre de jours T max > 35°C", "Moyenne T max","Moyenne T min","Moyenne T moy")
+ind_eng <- c("Rain – evaporation", "Accumulated rainfall","Number of rainy days","Number of days T max > 25°C", 
+             "Number of days T max > 35°C", "T max mean","T min mean","T mean mean")
+
+```
+## Loading raster
+
+Specific to indicator and year of prevision
+
+```{r}
+
+title <- paste0(indic[ind],"_probsign.tif")
+stacky <- stack(file.path(dir_plot, "season_raster", title)) # loading stack file
+
+#load(file = file.path(dir_plot, "season_raster", "probquin_layname.RData")) # loading stack layer names before writeraster changed them
+#names(stacky) <- c(layername)# re setting original layer names
+```
+## Creating maps displaying prevision and skill shapefiles
+
+We create one shapefile per month from each raster layer extraction
+
+```{r}
+
+## CREATING SHAPEFILE TO BE PLOTTED BY EXTRACTING RASTER LAYER + FACET DISPLAYING 
+tmap_mode('plot')
+ltshp_score <- list()
+ltshp_sign <- list()
+maprev <- list()
+grid.newpage()
+page.layout <- grid.layout(nrow = 3, ncol = 3)
+pushViewport(viewport(layout = page.layout))
+
+
+for (m in 1:ndimT){
+ 
+  ### we build the shapefiles of tercile scores
+  
+  lt_score <- rasterToPolygons(stacky[[2+5*(m-1)]]) 
+  names(lt_score) <- "ROC.Low.Tercile"
+  ltshp_score[[m]] <- st_as_sf(lt_score)
+
+  ### we build the shapefile of score statistical significance 
+  lt_sign <- rasterToPolygons(stacky[[3+5*(m-1)]])
+  names(lt_sign) <- "lowter_significance"
+  lt_sign$lowter_significance[which(lt_sign$lowter_significance==0)] <- NA # to help plotting
+  ltshp_sign[[m]] <- st_as_sf(lt_sign)
+
+  ### mapping
+  titre <- paste0(ind_eng[ind]," ","score on"," ", moi[m])
+  maprev [[m]] <- qtm(ltshp_score[[m]], fill = "ROC.Low.Tercile", fill.style="cont", fill.breaks=c( 0.2, 0.4, 0.6, 0.8, 1),
+     attr.outside = TRUE,borders = NULL, fill.palette = "YlOrRd")+ 
+ tm_shape(ltshp_sign[[m]])+
+   tm_symbols(size ="lowter_significance", col = "yellow", legend.size.show = FALSE, scale = 0.1)+
+ #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+ #tm_scale_bar()+
+     tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
+
+   if (m<4){
+  print(maprev[[m]], vp=viewport(layout.pos.row = 1, layout.pos.col = m))
+  }
+  else {
+  print(maprev[[m]], vp=viewport(layout.pos.row = 2, layout.pos.col = m-3))
+  }
+
+}
+
+com_legend <- qtm(ltshp_score[[m]], fill = "ROC.Low.Tercile", fill.style="cont", fill.breaks=c( 0.2, 0.4, 0.6, 0.8, 1),
+     attr.outside = TRUE,borders = NULL, fill.palette = "YlOrRd")+ 
+     tm_layout(legend.only = TRUE)
+
+print(com_legend, vp=viewport(layout.pos.row = 3, layout.pos.col = 2))
+
+```

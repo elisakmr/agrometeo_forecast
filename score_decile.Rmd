@@ -1,0 +1,198 @@
+---
+title: "Decile detection scoring"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+
+library(easyVerification)
+library(verification)
+library(dplyr)
+library(stats)
+library(SpecsVerification)
+library(s2dverification)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+library(readr)
+library(purrr)
+
+no_core <- 6
+nboot <- 500
+
+```
+
+## Loading latitude file
+
+To be used for weighted aggregation.
+
+```{r }
+load(file = file.path(dir_data, "extract", "lat.RData"))
+lat <- as.vector(vect_lat)
+
+```
+
+
+## Box-agregated scores
+
+Aggregation computed using latitude weighting
+
+```{r}
+tictoc::tic()
+
+for (ind in 2:8){
+  list_boot1 <- list()
+  list_boot2 <- list()
+  list_event1 <- list()
+  vect_event2 <- vector()
+  ev <- 0
+  for (e in c(1,10)){ #LT,MT,HT
+    ev <- ev+1
+    for (b in 1:nboot){
+    nom_prevseas <- paste0(indic[ind],b,"_seasdecile_prev.RData")
+    nom_refseas <- paste0(indic[ind],b,"_seasdecile_obs.RData")
+    load(file = file.path(dir_data, "extract", nom_prevseas))
+    load(file = file.path(dir_data, "extract", nom_refseas))
+    
+    if (ind!=3 & ind!=4 & ind!=5) { # monthly
+      nom_ref <- paste0(indic[ind],b,"_monthdecile_obs.RData")
+      nom_prev <- paste0(indic[ind],b,"_monthdecile_prev.RData")
+      load(file = file.path(dir_data, "extract", nom_ref))
+      load(file = file.path(dir_data, "extract", nom_prev))
+      vect_month <- vector()
+      
+      for (t in 1: ndimT){
+         vect_month[t] <- score_boite_prob(monthprob_ps[,,t,], monthbin_ref[,,t,], lat[,1], nb_bin = 5, e)$AUC
+       }
+
+    }
+
+     if (ind!=3 & ind!=4 & ind!=5) { # monthly
+       vect_month <- vector()
+       
+     list_event1[[ev]] <- vect_month
+     }
+
+    
+
+   
+    vect_event2[ev] <- score_boite_prob(seasprob_ps, seasbin_ref, lat[,1], nb_bin = 5, e)$AUC # seasonal 
+
+   }
+  
+  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+  list_boot1[[b]] <- list_event1 # monthtly 
+  }
+  
+  list_boot2[[b]] <- vect_event2 # seasonal 
+  
+  }
+ 
+  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+  nom_month <- paste0(indic[ind],"boxdecile_month.RData")
+  save(list_boot1, file = file.path(dir_data, "score", nom_month))
+  }
+  
+  nom_seas <- paste0(indic[ind],"boxdecile_seas.RData")
+  save(list_boot2, file = file.path(dir_data, "score", nom_seas))
+
+}
+
+tictoc::toc()
+
+```
+## Box-agregated score analysis
+
+Transform lists in a more handy format
+
+```{r}
+
+for (ind in 2:8){
+  
+   # season
+  nom_ps <- paste0(indic[ind],"boxdecile_seas.RData")
+  load(file = file.path(dir_data, "score", nom_ps))
+  
+  sum_seas <- apply(array(unlist(list_boot2) , c(3,nboot)), 1, mean, na.rm = T)
+  
+  nom_seas <- paste0(indic[ind],"avboxdecile_seas.csv")
+  write_csv(as.data.frame(sum_seas), file.path(dir_data, "score", nom_seas))
+  
+  # month
+  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+  nom_ps <- paste0(indic[ind],"boxdecile_month.RData")
+  load(file = file.path(dir_data, "score", nom_ps))
+  
+  sum_month <- apply(array(unlist(list_boot1) , c(6,3,nboot)), c(1,2), mean, na.rm = T)
+  
+  colnames(sum_month) <- c("LT","MT","HT")
+  nom_month <- paste0(indic[ind],"avboxdecile_month.csv")
+  write_csv(as.data.frame(sum_month), file.path(dir_data, "score", nom_month))
+  
+}
+
+}
+
+```
+
+
+## Gridded scores
+
+Scores computed for each grid separately.
+Continuous indicators are assessed monthly while discrete indicators are assessed on whole aggregated season = 6 months (monthly summaries are summed up). 
+
+```{r}
+tictoc::tic()
+e <- 2
+
+for (ind in 1:8){
+  
+  cl <- makeCluster(no_core)
+  registerDoParallel(cl)
+
+foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
+
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+
+  # only continuous indicators assessed monthly
+    scoreprob_month_ps <- array (NA, dim=c(ngrids,ndimT,e))
+    scoreprob_seas_ps <- array (NA, dim=c(ngrids,e))
+    
+    # monthly
+    if (ind!=3 & ind!=4 & ind!=5) { 
+       for (t in 1:ndimT){
+        scoreprob_month_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1/10, parallel = TRUE)$cat1 
+        scoreprob_month_ps[,t,2] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=9/10, parallel = TRUE)$cat1 
+       }
+    }
+    
+    # seasonal
+    seas_obs <- apply(array_obs[,,],c(1,2), sum)
+    seas_prev <- apply(array_prev[,,,],c(1,2,3), sum)
+    
+    scoreprob_seas_ps[,1] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=1/10, parallel = TRUE)$cat1 
+    scoreprob_seas_ps[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=9/10, parallel = TRUE)$cat1 
+   
+    nom_prevmont <- paste0(indic[ind], b,"scoredecilemonth_grid_prev.RData")
+    nom_prevseas <- paste0(indic[ind], b,"scoredecileseason_grid_prev.RData")
+
+    save(scoreprob_month_ps, file = file.path(dir_data, "score", nom_prevmont))
+    save(scoreprob_seas_ps, file = file.path(dir_data, "score", nom_prevseas))
+
+  }
+
+stopCluster(cl)
+}
+
+tictoc::toc()
+
+
+
+```

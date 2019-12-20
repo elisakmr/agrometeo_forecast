@@ -1,61 +1,42 @@
-boot_month <- list()
-boot_seas <- list()
 
-for(b in 1:nboot)   {
-  # loading gridded scores
+m <- 3
 
-  # seasonal
-  nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
-  load(file = file.path(dir_data, "score", nom_prevseas))
+shp_quint1<- list()
 
-  box_prev_month <- matrix(nrow = ndimT, ncol = 3)
+sp_quint1 <- rasterToPolygons(stacky_mois[[2+3*(m-1)]])
+names(sp_quint1) <- "quintile1"
+sp_quint1$quintile1[which(sp_quint1$quintile1==0)] <- NA # to help plotting
+shp_quint1[[m]] <- st_as_sf(sp_quint1)
 
-  # monthly
-  if (ind!=3 & ind!=4 & ind!=5) {
-    nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
-    load(file = file.path(dir_data, "score", nom_prevmonth))
+shp_quint1[[m]]$quintile1 <- as.factor(shp_quint1[[m]]$quintile1)
 
-    for (t in 1:ndimT){
-      # box aggregation with latitude weighting
-      val_prevmonth <- list()
+### we build the shapefile of prevision confidence
+sp_quint5 <- rasterToPolygons(stacky_mois[[3+3*(m-1)]])
+names(sp_quint5) <- "quintile5"
+sp_quint5$quintile5[which(sp_quint5$quintile5==0)] <- NA # to help plotting
+shp_quint5[[m]] <- st_as_sf(sp_conf)
 
-      for (i in 1:ngrids){
-        val_prevmonth[[i]] <- det_month[i,,t]*cos(pi*lati[i,1]/180)
-        coeff[i] <- cos(pi*lati[i,1]/180)
-        # removing NAs
-        if (length(which(is.na(det_month[i,])))>0){
-          coeff[i] <- NA
-          val_prevmonth[[i]] <- rep(NA,3)
-        }
-
-      }
-
-      box_prev_month[t,] <- apply(array(unlist(val_prevmonth) , c(3,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
-      #box_prev_month[t,] <- Reduce("+", val_prevmonth)/sum(coeff)
-
-    }
-    boot_month[[b]] <- box_prev_month
-  }
-  # seasonal
-  val_prevseas <- list()
-
-  for (i in 1:ngrids){
-    val_prevseas[[i]] <- det_seas[i,]*cos(pi*lati[i,1]/180)
-    coeff[i] <- cos(pi*lati[i,1]/180)
-    # removing NAs
-    if (length(which(is.na(det_seas[i,])))>0){
-      coeff[i] <- NA
-      val_prevseas[[i]] <- rep(NA,3)
-    }
-  }
-
-  boot_seas[[b]] <- apply(array(unlist(val_prevseas) , c(3,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
-}
-
-if (ind!=3 & ind!=4 & ind!=5) {
-
-  month_ps <- apply(array(unlist(boot_month) , c(6,3,nboot)), c(1,2), mean)
-}
-seas_ps <- apply(array(unlist(boot_seas) , c(3,nboot)), 1, mean, na.rm=T)
+ht_score <- rasterToPolygons(stack_month[[4+5*(m-1)]])
+names(ht_score) <- "ROC.High.Tercile"
+ht_score$ROC.High.Tercile[which(ht_score$ROC.High.Tercile==-1)] <- NA # to help plotting
+htshp_score[[m]] <- st_as_sf(ht_score)
 
 
+#    1st tercile = lower tercile; 2nd = middle; 3rd = upper
+### mapping
+titre <- paste0(ind_eng[ind]," ","for"," ", moi[m], " ", select_year)
+maprev [[m]]<- qtm(shp_quint1[[m]], fill = "quintile1",
+                   attr.outside = TRUE,borders = NULL, fill.style="cont",fill.breaks=c(seq(0.45, 1, length.out = 6)),
+                   fill.palette = score_palette)+
+   qtm(shp_quint5[[m]], fill = "quintile5",
+       attr.outside = TRUE,borders = NULL, fill.style="cont",fill.breaks=c(seq(0.45, 1, length.out = 6)),
+       fill.palette = score_palette, legend.fill.show=FALSE)+
+   #tm_grid(y=c(43.487, 43.787), x=c(4,03,4.5,5),  labels.inside.frame = TRUE, alpha = 0, labels.rot = c(0,90))+
+   #tm_scale_bar()+
+   #tm_add_legend(type = "fill", labels = c("3rd tercile","2nd tercile","1st tercile"), col =  c("dodgerblue3","lightgrey","darkslategray2"), alpha = 0.5)+
+   tm_layout(title = titre, title.position = c("left","bottom"), title.size = 0.5, legend.show = FALSE)
+
+qtm(htshp_score[[m]], fill = "ROC.High.Tercile",
+    fill.style="cont", fill.breaks=c(seq(0, 1, length.out = 6)),borders = NULL, fill.palette = score_palette)+
+qtm(shp_quint1[[m]], fill = "quintile1",
+    fill.style="cont",borders = NULL, fill.palette = score_palette) #fill.breaks=c(seq(0, 10, length.out = 6)),
