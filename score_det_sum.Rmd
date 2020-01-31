@@ -29,10 +29,10 @@ We aggregate gridded deterministic scores with latitude weighting.
 load(file = file.path(dir_data, "extract", "lat.RData"))
 lati <- as.vector(vect_lat)
 coeff <- vector()
-month_ps <- matrix(ncol = 3, nrow = 6)
-seas_ps <- matrix(ncol = 3, nrow = 6)
+month_ps <- matrix(ncol = 2, nrow = 6)
+seas_ps <- matrix(ncol = 2, nrow = 1)
 
-for (ind in 5:8){
+for (ind in 2:8){
 boot_month <- list()
 boot_seas <- list()
 
@@ -43,34 +43,34 @@ for(b in 1:nboot)   {
   nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
   load(file = file.path(dir_data, "score", nom_prevseas))
 
-  box_prev_month <- matrix(nrow = ndimT, ncol = 3)
 
   # monthly
-  if (ind!=3 & ind!=4 & ind!=5) {
-    nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
-    load(file = file.path(dir_data, "score", nom_prevmonth))
-
-    for (t in 1:ndimT){
-      # box aggregation with latitude weighting
-      val_prevmonth <- list()
-
-      for (i in 1:ngrids){
-        val_prevmonth[[i]] <- det_month[i,,t]*cos(pi*lati[i,1]/180)
-        coeff[i] <- cos(pi*lati[i,1]/180)
-        # removing NAs
-        if (length(which(is.na(det_month[i,,t])))>0){
-          coeff[i] <- NA
-          val_prevmonth[[i]] <- rep(NA,3)
-        }
-
-      }
-
-      box_prev_month[t,] <- apply(array(unlist(val_prevmonth) , c(3,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
-      #box_prev_month[t,] <- Reduce("+", val_prevmonth)/sum(coeff)
-
-    }
-    boot_month[[b]] <- box_prev_month
-  }
+  # if (ind!=3 & ind!=4 & ind!=5) {
+  #    box_prev_month <- matrix(nrow = ndimT, ncol = 3)
+  #   nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
+  #   load(file = file.path(dir_data, "score", nom_prevmonth))
+  # 
+  #   for (t in 1:ndimT){
+  #     # box aggregation with latitude weighting
+  #     val_prevmonth <- list()
+  # 
+  #     for (i in 1:ngrids){
+  #       val_prevmonth[[i]] <- det_month[i,,t]*cos(pi*lati[i,1]/180)
+  #       coeff[i] <- cos(pi*lati[i,1]/180)
+  #       # removing NAs
+  #       if (length(which(is.na(det_month[i,,t])))>0){
+  #         coeff[i] <- NA
+  #         val_prevmonth[[i]] <- rep(NA,3)
+  #       }
+  # 
+  #     }
+  # 
+  #     box_prev_month[t,] <- apply(array(unlist(val_prevmonth) , c(3,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
+  #     #box_prev_month[t,] <- Reduce("+", val_prevmonth)/sum(coeff)
+  # 
+  #   }
+  #   boot_month[[b]] <- box_prev_month
+  #}
   # seasonal
   val_prevseas <- list()
 
@@ -80,22 +80,22 @@ for(b in 1:nboot)   {
     # removing NAs
     if (length(which(is.na(det_seas[i,])))>0){
       coeff[i] <- NA
-      val_prevseas[[i]] <- rep(NA,3)
+      val_prevseas[[i]] <- rep(NA,2)
     }
   }
 
-  boot_seas[[b]] <- apply(array(unlist(val_prevseas) , c(3,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
+  boot_seas[[b]] <- apply(array(unlist(val_prevseas) , c(2,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
 }
 
-  if (ind!=3 & ind!=4 & ind!=5) {
-  month_ps <- apply(array(unlist(boot_month) , c(6,3,nboot)), c(1,2), mean)
-  colnames(month_ps) <- c("MSESS","ACC_ps","ACC_clim")
-  nom_psmonth <- paste0(indic[ind], "monthdet_box_prev.csv")
-  write_csv(as.data.frame(month_ps), file.path(dir_data, "score", nom_psmonth))
-  }
+  # if (ind!=3 & ind!=4 & ind!=5) {
+  # month_ps <- apply(array(unlist(boot_month) , c(6,3,nboot)), c(1,2), mean)
+  # colnames(month_ps) <- c("MSESS","ACC_ps","ACC_clim")
+  # nom_psmonth <- paste0(indic[ind], "monthdet_box_prev.csv")
+  # write_csv(as.data.frame(month_ps), file.path(dir_data, "score", nom_psmonth))
+  # }
   
   nom_psseas <- paste0(indic[ind], "seasdet_box_prev.csv")
-  seas_ps <- apply(array(unlist(boot_seas) , c(3,nboot)), 1, mean, na.rm=T)
+  seas_ps <- apply(array(unlist(boot_seas) , c(2,nboot)), 1, mean, na.rm=T)
   write_csv(as.data.frame(seas_ps), file.path(dir_data, "score", nom_psseas))
 
 }

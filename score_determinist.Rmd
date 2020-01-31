@@ -28,7 +28,7 @@ acc_prev <- vector()
 acc_clim <- vector()
 msess <- vector()
 
-for (ind in 1:8){
+for (ind in 2:8){
    # require(doSNOW)
    # registerDoSNOW(makeCluster(2, type = "SOCK"))
 
@@ -44,14 +44,12 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
   nom_prev <- paste0(indic[ind],b,"_prev.RData")
   nom_clim <- paste0(indic[ind],b,"_clim.RData")
   nom_an_prev <- paste0(indic[ind],b,"_anomaly_prev.RData")
-  nom_an_clim <- paste0(indic[ind],b,"_anomaly_clim.RData")
   nom_an_obs <- paste0(indic[ind],b,"_anomaly_obs.RData")
   
   load(file = file.path(dir_data, "extract", nom_ref))
   load(file = file.path(dir_data, "extract", nom_prev))
   load(file = file.path(dir_data, "extract", nom_clim))
   load(file = file.path(dir_data, "extract", nom_an_prev))
-  load(file = file.path(dir_data, "extract", nom_an_clim))
   load(file = file.path(dir_data, "extract", nom_an_obs))
   
   # ensemble mean 
@@ -62,39 +60,38 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
   
       ### MONTHLY ###
   
-  det_month <- array(NA, dim = c(ngrids,3,ndimT))
-
-  for (t in 1:ndimT){ 
-    
-    # MSESS
-    
-  msess <- veriApply("EnsMsess", fcst=t(prev_mean[,,t]), fcst.ref=t(clim_mean[,,t]), obs=t(array_obs[,,t]), parallel = TRUE)
-
-   # ACC #
-    
-      # Pearson for continued indicators
-    #if (ind!=3 & ind!=4 & ind!=5) { 
-      # ref vs prev
-    acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)
-      # ref vs clim
-    acc_clim <- veriApply("EnsCorr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)
-    
-    # } else { # Spearman for ordinal indicators
-    #   Spearman <- s2dverification:::.Corr
-    #   # ref vs prev
-    # acc_prev <- veriApply("Corr", fcst=clim_anomaly[,,,t], obs=clim_anomaly[,,,t],  posloop = 2,)$corr
-    #   # ref vs clim
-    # acc_clim <- veriApply("Corr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)$corr
-    #   
-    # }
-  
-  det_month[,,t] <- array(c(msess, acc_prev, acc_clim), dim=c(ngrids,3))
-
-  }
+  # det_month <- array(NA, dim = c(ngrids,2,ndimT))
+  # 
+  # for (t in 1:ndimT){ 
+  #   
+  #   # MSESS
+  #   
+  # msess <- veriApply("EnsMsess", fcst=t(prev_mean[,,t]), fcst.ref=t(clim_mean[,,t]), obs=t(array_obs[,,t]), parallel = TRUE)
+  # 
+  #  # ACC #
+  #   
+  #     # Pearson for continued indicators
+  #   #if (ind!=3 & ind!=4 & ind!=5) { 
+  #     # ref vs prev
+  #   acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)
+  #     # ref vs clim
+  # 
+  #   # } else { # Spearman for ordinal indicators
+  #   #   Spearman <- s2dverification:::.Corr
+  #   #   # ref vs prev
+  #   # acc_prev <- veriApply("Corr", fcst=clim_anomaly[,,,t], obs=clim_anomaly[,,,t],  posloop = 2,)$corr
+  #   #   # ref vs clim
+  #   # acc_clim <- veriApply("Corr", fcst=clim_anomaly[,,,t], obs=obs_anomaly[,,t], parallel = TRUE)$corr
+  #   #   
+  #   # }
+  # 
+  # det_month[,,t] <- array(c(msess, acc_prev), dim=c(ngrids,2))
+  # 
+  # }
   
       ### SEASONAL ###
   
-  det_seas <- array(NA, dim = c(ngrids,3))
+  det_seas <- array(NA, dim = c(ngrids,2))
 
   prev_seas <- apply(array_prev, c(1,2,3), sum)
   clim_seas <- apply(array_clim, c(1,2,3), sum)
@@ -103,23 +100,18 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
   prev_seas_mean <- apply(prev_seas, c(1,2), mean)
   clim_seas_mean <- apply(clim_seas, c(1,2), mean)
   
-  anoprev_seas <- apply(prev_anomaly, c(1,2,3), sum)
-  anoclim_seas <- apply(clim_anomaly, c(1,2,3), sum)
-  anoref_seas <- apply(obs_anomaly, c(1,2), sum)
-  
     # MSESS
     
-  msess <- veriApply("EnsMsess", fcst=t(prev_seas_mean), fcst.ref=t(clim_seas_mean), obs=t(ref_seas), parallel = TRUE)
+  msess <- veriApply("EnsMsess", fcst=prev_seas, fcst.ref=clim_seas, obs=ref_seas, parallel = TRUE)
 
     # ACC #
     
       # Pearson for continued indicators
         #if (ind!=3 & ind!=4 & ind!=5) { 
       # ref vs prev
-    acc_prev <- veriApply("EnsCorr", fcst=anoprev_seas, obs=anoref_seas)
+  acc_prev <- veriApply("EnsCorr", fcst=prev_anomaly, obs=obs_anomaly)
       # ref vs clim
-    acc_clim <- veriApply("EnsCorr", fcst=anoclim_seas, obs=anoref_seas)
-    
+
     #     } else { # Spearman for ordinal indicators
     #       Spearman <- s2dverification:::.Corr
     #   # ref vs prev
@@ -129,12 +121,12 @@ foreach(b=1:500, .packages=c('easyVerification', 's2dverification')) %dopar%  { 
     #    
     # }
     
-  det_seas <- array(c(msess, acc_prev, acc_clim), dim=c(ngrids,3))
+  det_seas <- array(c(msess, acc_prev), dim=c(ngrids,2))
   
   nom_prevmonth <- paste0(indic[ind], b,"scoredetmonth_grid_prev.RData")
   nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
 
-  save(det_month, file = file.path(dir_data, "score", nom_prevmonth))
+  #save(det_month, file = file.path(dir_data, "score", nom_prevmonth))
   save(det_seas, file = file.path(dir_data, "score", nom_prevseas))
 
   #gc(TRUE)

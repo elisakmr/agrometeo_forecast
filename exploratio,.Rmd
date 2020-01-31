@@ -101,6 +101,12 @@ test_df <- as.data.frame(cbind(ps_season[,y],ref_season[,y]))
 colnames(test_df) <- c("prevision","ref")
 PlotForecastPDF(test_df,tercile_bound, add.ensmemb = 'no', var.name = paste0(indic[ind],"(mm)"),title = paste0(indic[ind]," year ", an[y]))
 
+test_df <- as.data.frame(cbind(ps_season[,y],ref_season[,y]))
+ps_ens <- as.data.frame(t(ps_season_int[,y,]))
+colnames(test_df) <- c("prevision","ref")
+PlotForecastPDF(fcst=ps_ens,tercile.limits=tercile_bound, add.ensmemb = 'no', var.name = paste0(indic[ind],"(mm)"),title = paste0(indic[ind]," year ", an[y]))
+#obs=ref_season_int[,y],
+PlotForecastPDF(fcst=ps_ens,tercile.limits=tercile_bound, add.ensmemb = 'no', var.name = paste0(indic[ind],"(mm)"),title = paste0(indic[ind]," year ", an[y]))
 
 ```
 

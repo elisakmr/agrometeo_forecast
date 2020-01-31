@@ -26,7 +26,7 @@ library(nnet)
 ```{r}
 
 moi <- c("May","June","July","August","September","October","November")
-nscore <- 3
+nscore <- 2
 
 ```
 ### MONTHLY ###
@@ -111,7 +111,7 @@ save(layername, file = file.path(dir_plot, "season_raster", "layname_detmonth.RD
 
 ```{r}
 
-for (ind in 1:8){
+for (ind in 6:8){
   
     ## loading dataframe of prevision with associated coordinates
   # 1=MSESS, 2=ACC prev, 3=ACC clim

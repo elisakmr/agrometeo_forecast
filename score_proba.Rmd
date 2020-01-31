@@ -59,39 +59,36 @@ for (ind in 1:8){
     
     for (e in 1:3){#LT,MT,HT
       
-      if (ind!=3 & ind!=4 & ind!=5) { # monthly
-        nom_ref <- paste0(indic[ind],b,"_monthbin_obs.RData")
-        nom_prev <- paste0(indic[ind],b,"_monthprob_prev.RData")
-        load(file = file.path(dir_data, "extract", nom_ref))
-        load(file = file.path(dir_data, "extract", nom_prev))
-        
-        vect_month <- vector()
-        for (t in 1: ndimT){
-           vect_month[t] <- score_boite_prob(monthprob_ps[,,t,], monthbin_ref[,,t,], lati[,1], nb_bin = 5, e)$AUC
-        }
-  
-      }
-  
-       if (ind!=3 & ind!=4 & ind!=5) { # monthly
-         
-       list_event1[[e]] <- vect_month
-       }
+      # if (ind!=3 & ind!=4 & ind!=5) { # monthly
+      #   nom_ref <- paste0(indic[ind],b,"_monthbin_obs.RData")
+      #   nom_prev <- paste0(indic[ind],b,"_monthprob_prev.RData")
+      #   load(file = file.path(dir_data, "extract", nom_ref))
+      #   load(file = file.path(dir_data, "extract", nom_prev))
+      #   
+      #   vect_month <- vector()
+      #   for (t in 1: ndimT){
+      #      vect_month[t] <- score_boite_prob(monthprob_ps[,,t,], monthbin_ref[,,t,], lati[,1], nb_bin = 5, e)$AUC
+      #   }
+      # 
+      # 
+      #  list_event1[[e]] <- vect_month
+      #  }
 
     vect_event2[e] <- score_boite_prob(seasprob_ps, seasbin_ref, lati[,1], nb_bin = 5, e)$AUC # seasonal 
 
    }
   
-   if (ind!=3 & ind!=4 & ind!=5) { # monthly
-   list_boot1[[b]] <- list_event1 # monthtly 
-   }
+   # if (ind!=3 & ind!=4 & ind!=5) { # monthly
+   # list_boot1[[b]] <- list_event1 # monthtly 
+   # }
   
    list_boot2[[b]] <- vect_event2 # seasonal 
   }
  
-  if (ind!=3 & ind!=4 & ind!=5) { # monthly
-  nom_month <- paste0(indic[ind],"boxprob_month.RData")
-  save(list_boot1, file = file.path(dir_data, "score", nom_month))
-  }
+  # if (ind!=3 & ind!=4 & ind!=5) { # monthly
+  # nom_month <- paste0(indic[ind],"boxprob_month.RData")
+  # save(list_boot1, file = file.path(dir_data, "score", nom_month))
+  # }
   
   nom_seas <- paste0(indic[ind],"boxprob_seas.RData")
   save(list_boot2, file = file.path(dir_data, "score", nom_seas))
@@ -140,8 +137,8 @@ for (ind in 1:8){
 Wilcoxon test with H0: AUC non supérieure à 0.5
 
 ```{r}
-event <- 2
-ind <- 8
+event <- 3
+ind <- 2
 wlt_month <- vector()
 wht_month <- vector()
 
@@ -152,7 +149,7 @@ wht_month <- vector()
   boxboot <- array(unlist(list_boot2) , c(event,nboot))
   
   wlt <- wilcox.test(boxboot[1,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
-  wht <- wilcox.test(boxboot[2,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+  wht <- wilcox.test(boxboot[3,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
 
  # month
   if (ind!=3 & ind!=4 & ind!=5) { # monthly
