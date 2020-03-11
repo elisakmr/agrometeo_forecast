@@ -1,6 +1,7 @@
 ---
-title: "Quintile scoring"
+title: "score_proba"
 output: html_document
+67.26 sec elapsed
 ---
 
 ```{r setup, include=FALSE}
@@ -32,7 +33,7 @@ To be used for weighted aggregation.
 
 ```{r }
 load(file = file.path(dir_data, "extract", "lat.RData"))
-lat <- as.vector(vect_lat)
+lati <- as.vector(vect_lat)
 
 ```
 
@@ -50,47 +51,47 @@ for (ind in c(2,3,4,8)){
   list_event1 <- list()
   vect_event2 <- vector()
   
-  for (b in 1:nboot){
-    nom_prevseas <- paste0(indic[ind],b,"_seasquint_prev.RData")
-    nom_refseas <- paste0(indic[ind],b,"_seasquint_obs.RData")
+  for (b in 1:nboot){ 
+    
+    nom_prevseas <- paste0(indic[ind],b,"_seasprob_prev.RData")
+    nom_refseas <- paste0(indic[ind],b,"_seasbin_obs.RData")
     load(file = file.path(dir_data, "extract", nom_prevseas))
     load(file = file.path(dir_data, "extract", nom_refseas))
-    ev <- 0
-
-    for (e in c(1,5)){ #LQ,HQ
-      ev <- ev+1
+    
+    for (e in 1:3){#LT,MT,HT
+      
       # if (ind!=3 & ind!=4 & ind!=5) { # monthly
-      #   nom_ref <- paste0(indic[ind],b,"_monthquint_obs.RData")
-      #   nom_prev <- paste0(indic[ind],b,"_monthquint_prev.RData")
+      #   nom_ref <- paste0(indic[ind],b,"_monthbin_obs.RData")
+      #   nom_prev <- paste0(indic[ind],b,"_monthprob_prev.RData")
       #   load(file = file.path(dir_data, "extract", nom_ref))
       #   load(file = file.path(dir_data, "extract", nom_prev))
-      #   vect_month <- vector()
       #   
+      #   vect_month <- vector()
       #   for (t in 1: ndimT){
-      #      vect_month[t] <- score_boite_prob(monthprob_ps[,,t,], monthbin_ref[,,t,], lat[,1], nb_bin = 5, e)$AUC
+      #      vect_month[t] <- score_boite_prob(monthprob_ps[,,t,], monthbin_ref[,,t,], lati[,1], nb_bin = 5, e)$AUC
       #   }
       # 
-      #   vect_month <- vector()
-      #   list_event1[[ev]] <- vect_month
-      # }
-      
-      vect_event2[ev] <- score_boite_prob(seasprob_ps, seasbin_ref, lat[1], nb_bin = 10, e)$AUC # seasonal 
-    }
-    
-    # if (ind!=3 & ind!=4 & ind!=5) { # monthly
-    # list_boot1[[b]] <- list_event1 # monthtly 
-    # }
-    
-    list_boot2[[b]] <- vect_event2 # seasonal 
-    
+      # 
+      #  list_event1[[e]] <- vect_month
+      #  }
+
+    vect_event2[e] <- score_boite_prob(seasprob_ps, seasbin_ref, lati, nb_bin = 10, e)$AUC # seasonal 
+
+   }
+  
+   # if (ind!=3 & ind!=4 & ind!=5) { # monthly
+   # list_boot1[[b]] <- list_event1 # monthtly 
+   # }
+  
+   list_boot2[[b]] <- vect_event2 # seasonal 
   }
  
   # if (ind!=3 & ind!=4 & ind!=5) { # monthly
-  # nom_month <- paste0(indic[ind],"boxquint_month.RData")
+  # nom_month <- paste0(indic[ind],"boxprob_month.RData")
   # save(list_boot1, file = file.path(dir_data, "score", nom_month))
   # }
   
-  nom_seas <- paste0(indic[ind],"boxquint_seas.RData")
+  nom_seas <- paste0(indic[ind],"boxprob_seas.RData")
   save(list_boot2, file = file.path(dir_data, "score", nom_seas))
 
 }
@@ -103,28 +104,27 @@ tictoc::toc()
 Transform lists in a more handy format
 
 ```{r}
-event <- 2
-
+event <- 3
 for (ind in c(2,3,4,8)){
   
    # season
-  nom_ps <- paste0(indic[ind],"boxquint_seas.RData")
+  nom_ps <- paste0(indic[ind],"boxprob_seas.RData")
   load(file = file.path(dir_data, "score", nom_ps))
   
   sum_seas <- apply(array(unlist(list_boot2) , c(event,nboot)), 1, mean, na.rm = T)
   
-  nom_seas <- paste0(indic[ind],"avboxquint_seas.csv")
+  nom_seas <- paste0(indic[ind],"avboxprob_seas.csv")
   write_csv(as.data.frame(sum_seas), file.path(dir_data, "score", nom_seas))
   
-#   # month
+  # month
 #   if (ind!=3 & ind!=4 & ind!=5) { # monthly
-#   nom_ps <- paste0(indic[ind],"boxquint_month.RData")
+#   nom_ps <- paste0(indic[ind],"boxprob_month.RData")
 #   load(file = file.path(dir_data, "score", nom_ps))
 #   
 #   sum_month <- apply(array(unlist(list_boot1) , c(6,event,nboot)), c(1,2), mean, na.rm = T)
 #   
-#   colnames(sum_month) <- c("LQ","HQ")
-#   nom_month <- paste0(indic[ind],"avboxquint_month.csv")
+#   colnames(sum_month) <- c("LT","MT","HT")
+#   nom_month <- paste0(indic[ind],"avboxprob_month.csv")
 #   write_csv(as.data.frame(sum_month), file.path(dir_data, "score", nom_month))
 #   
 # }
@@ -132,24 +132,40 @@ for (ind in c(2,3,4,8)){
 }
 
 ```
+
 ## Box score significance test
 
 Wilcoxon test with H0: AUC non supérieure à 0.5
 
 ```{r}
-event <- 2
-ind <- 4
+event <- 3
+ind <- 8
 
    # season
-  nom_ps <- paste0(indic[ind],"boxquint_seas.RData")
+  nom_ps <- paste0(indic[ind],"boxprob_seas.RData")
   load(file = file.path(dir_data, "score", nom_ps))
   
   boxboot <- array(unlist(list_boot2) , c(event,nboot))
   
-  wilcox.test(boxboot[1,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
-  wilcox.test(boxboot[2,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+   wilcox.test(boxboot[1,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+   wilcox.test(boxboot[3,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+
+ # # month
+ #  if (ind!=3 & ind!=4 & ind!=5) { # monthly
+ #  nom_ps <- paste0(indic[ind],"boxprob_month.RData")
+ #  load(file = file.path(dir_data, "score", nom_ps))
+ #  
+ #  boxboot_month <- array(unlist(list_boot1) , c(6,event,nboot))
+ #  
+ #  for(t in 1:ndimT){
+ #  wlt_month[t] <- wilcox.test(boxboot_month[t,1,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+ #  wht_month[t] <- wilcox.test(boxboot_month[t,2,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+ #  }
+
 
 ```
+
+
 ## Gridded scores
 
 Scores computed for each grid separately.
@@ -159,7 +175,7 @@ Continuous indicators are assessed monthly while discrete indicators are assesse
 tictoc::tic()
 e <- 2
 
-for (ind in 2:8){
+for (ind in 1:8){
   
   cl <- makeCluster(no_core)
   registerDoParallel(cl)
@@ -179,24 +195,25 @@ foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstra
     # monthly
     if (ind!=3 & ind!=4 & ind!=5) { 
        for (t in 1:ndimT){
-        scoreprob_month_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1/5, parallel = TRUE)$cat1 
-        scoreprob_month_ps[,t,2] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=4/5, parallel = TRUE)$cat1 
+        scoreprob_month_ps[,t,1] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat1 
+        scoreprob_month_ps[,t,2] <- veriApply("EnsRoca", fcst=array_prev[,,,t], obs=array_obs[,,t], prob=1:2/3, parallel = TRUE)$cat3 
        }
-    nom_prevmont <- paste0(indic[ind], b,"scorequintmonth_grid_prev.RData")
-    save(scoreprob_month_ps, file = file.path(dir_data, "score", nom_prevmont))
+      nom_prevmont <- paste0(indic[ind], b,"scoreprobmonth_grid_prev.RData")
+      save(scoreprob_month_ps, file = file.path(dir_data, "score", nom_prevmont))
+
     }
     
     # seasonal
     seas_obs <- apply(array_obs[,,],c(1,2), sum)
     seas_prev <- apply(array_prev[,,,],c(1,2,3), sum)
-    
-    scoreprob_seas_ps[,1] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=1/5, parallel = TRUE)$cat1 
-    scoreprob_seas_ps[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=4/5, parallel = TRUE)$cat1 
-   
-    nom_prevseas <- paste0(indic[ind], b,"scorequintseason_grid_prev.RData")
+    scoreprob_seas_ps[,1] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=1:2/3, parallel = TRUE)$cat1 
+    scoreprob_seas_ps[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=1:2/3, parallel = TRUE)$cat3 
+
+    nom_prevseas <- paste0(indic[ind], b,"scoreprobseason_grid_prev.RData")
     save(scoreprob_seas_ps, file = file.path(dir_data, "score", nom_prevseas))
 
   }
+  
 
 stopCluster(cl)
 }
@@ -206,3 +223,6 @@ tictoc::toc()
 
 
 ```
+
+
+

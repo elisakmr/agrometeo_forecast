@@ -1,0 +1,149 @@
+---
+title: "Data extraction"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season_trial2" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
+library(plyr)
+library(dplyr)
+library(tidyverse)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+no_core <- 6
+nboot <- 500
+```
+
+## Loading data aggregated in csv file
+
+This section gathers parameters to be specified beforehand.
+Binding the csv's
+
+```{r data loading, echo=FALSE}
+raw_data1 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_1993_1998.csv"), header = TRUE, sep = ",")
+raw_data2 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_1999_2004.csv"), header = TRUE, sep = ",")
+raw_data3 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_2005_2009.csv"), header = TRUE, sep = ",")
+raw_data4 <- read.csv(file = file.path(dir_data, "Extract_Season_Indicators_FR8_pmt541m_2010_2016.csv"), header = TRUE, sep = ",")
+raw_data <- rbind(raw_data1,raw_data2,raw_data3,raw_data4)
+```
+
+## Extracting parameters from csv to be used further
+
+List of indicators, years, temporal dimension (number of indicator values per year)
+
+```{r indicators, echo=FALSE}
+indic <- unique(raw_data[,"indicator"])
+nindic <- length(indic)
+an <- unique(raw_data[,"year_"])
+nan <- length(an)
+dimT <- unique(raw_data[,"month_"]) 
+ndimT <- length(dimT)
+ngrids <- length(unique(raw_data[,"cellnum"]))
+```
+## Extracting coordinates related to each cell
+We extract the coordinates of each cell to be used for mapping. To do so we pick a random climat type, year and t dimension, as grid range assessed remains the same no matter what are the values of these parameters.
+```{r, echo=FALSE}
+# latitudes
+vect_lat <- raw_data %>% filter(indicator == "moy_tmax", climattype == "REF", year_ == 2000, month_ == 5) %>% 
+  arrange(lat,lon) %>%
+  select(lat)
+save(vect_lat, file = file.path(dir_data, "extract", "lat.RData"))
+
+# longitudes
+vect_lon <- raw_data %>% filter(indicator == "moy_tmax", climattype == "REF", year_ == 2000, month_ == 5) %>% 
+  arrange(lat,lon) %>%
+  select(lon)
+save(vect_lon, file = file.path(dir_data, "extract", "lon.RData"))
+
+```
+## Extracting indicator values
+For each indicator, values are stored in 3 multi-dimensional arrays: one per climat type (reference, prevision, climatology)
+Reference array has 3 dimension: grid+year+t
+Prevision/climatology arrays have 4 dimensions: grid+year+run+t
+N.B.: 75.78 sec elapsed
+```{r, echo=FALSE}
+
+# generate random year series
+# rand_year <- list()
+# for (b in 1:nboot){
+#    rand_year[[b]] <- sample(1:nan, nan, replace = TRUE) 
+#  }
+#  save(rand_year, file = file.path(dir_data, "extract", "years.RData"))
+
+# array setting x*year(*run)*t
+run <- unique(clim_data[,"climatscenario"]) # ensemble members (same for climato and prevision)
+nrun <- length(run) # count of ens members - ignoring 0 set for reference only
+
+tictoc::tic() 
+for (ind in 1:8){
+
+ # indicator type filtering
+    indic_data <- raw_data %>% 
+      filter(indicator == indic[ind])
+    
+      # climat type filtering
+    obs_data <- indic_data %>% 
+      filter(climattype == "REF") %>% 
+      arrange(lat,lon)
+    
+    prev_data <- indic_data %>% 
+      filter(climattype == "PS") %>%
+      arrange(lat,lon)
+    
+    clim_data <- indic_data %>% 
+      filter(climattype == "CLIMATO") %>% 
+      arrange(lat,lon)
+
+# extracting data
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+
+foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
+  array_obs <- array(NA, dim=c(ngrids, nan, ndimT))
+  array_prev <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
+  array_clim <- array(NA, dim=c(ngrids, nan, nrun, ndimT))
+
+    for (j in 1:nan){
+      y <- rand_year[[b]][j]
+      
+      obs_int <- obs_data %>% 
+      filter(year_ == y+1992) 
+      prev_int1 <- prev_data %>% 
+      filter(year_ == y+1992) 
+      clim_int1 <- clim_data %>% 
+      filter(year_ == y+1992) 
+      
+      for (t in 1:ndimT){
+        array_obs[,j,t] <- as.vector(unlist(obs_int %>% filter(month_ == t+4) %>% select(indicatorvalue)))
+        
+        prev_int2 <- prev_int1 %>% 
+        filter(month_ == t+4) 
+        clim_int2 <- clim_int1 %>% 
+        filter(month_ == t+4) 
+ 
+        for (r in 1:nrun){
+        # indicator value extracting
+        array_prev[,j,r,t] <- as.vector(unlist(prev_int2 %>% filter(climatscenario == r) %>% select(indicatorvalue)))
+        array_clim[,j,r,t] <- as.vector(unlist(clim_int2 %>% filter(climatscenario == r) %>% select(indicatorvalue)))
+        }
+      }
+    }
+  
+    nom_ref <- paste0(indic[ind],b,"_ref.RData")
+    nom_prev <- paste0(indic[ind],b,"_prev.RData")
+    nom_clim <- paste0(indic[ind],b,"_clim.RData")
+    
+    save(array_obs, file = file.path(dir_data, "extract", nom_ref))
+    save(array_prev, file = file.path(dir_data, "extract", nom_prev))
+    save(array_clim, file = file.path(dir_data, "extract", nom_clim))
+} 
+stopCluster(cl)
+}
+
+tictoc::toc()
+
+```

@@ -1,0 +1,82 @@
+---
+title: "Deterministic score preparation"
+output: html_document
+
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+library(easyVerification)
+library(verification)
+library(dplyr)
+library(plyr)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+no_core <- 6
+nboot <- 100
+month <- 4:6
+
+```
+
+## Loading files
+
+We load values previously extracted and compute ensemble means (mean between runs = models), which is required to compute deterministic scores. Values are stored in 2 3 dimensionial arrays (grids+years+t), one for prevision and one for climatology.
+N.B.: 831.22 sec elapsed
+
+```{r, echo=FALSE}
+for (ind in c(2,3,4,8)){
+cl <- makeCluster(no_core)
+registerDoParallel(cl)
+tictoc::tic()
+foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
+  
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  nom_clim <- paste0(indic[ind],b,"_clim.RData")
+  
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+  load(file = file.path(dir_data, "extract", nom_clim))
+
+  # CROSS VALIDATED ANOMALIES: we compute and save arrays of anomalies using cross validation scheme
+  if(ind==2|ind==3|ind==4|ind==5){
+      prev_seas <- apply(array_prev[,,,month], c(1,2,3), sum) #### aggregation method to be changed!!
+      ref_seas <- apply(array_obs[,,month], c(1,2), sum)
+  } else {prev_seas <- apply(array_prev[,,,month], c(1,2,3), mean) 
+  ref_seas <- apply(array_obs[,,month], c(1,2), mean)}
+  
+  prev_anomaly <- array(NA,dim=c(ngrids,nan,nrun))
+  obs_anomaly <- array(NA,dim=c(ngrids,nan))
+
+  for (y in 1:nan){
+    cv_mean_prev <- apply(prev_seas[,-y,], c(1,3), mean)
+    cv_mean_obs <- apply(ref_seas[,-y], 1, mean)
+
+    prev_anomaly[,y,] <- prev_seas[,y,]-cv_mean_prev
+    obs_anomaly[,y] <- ref_seas[,y]-cv_mean_obs
+    
+  }
+  
+
+  nom_prev <- paste0(indic[ind],b,"_anomaly_prev.RData")
+  nom_obs <- paste0(indic[ind],b,"_anomaly_obs.RData")
+
+  save(prev_anomaly, file = file.path(dir_data, "extract", nom_prev))
+  save(obs_anomaly, file = file.path(dir_data, "extract", nom_obs))
+  
+}
+stopCluster(cl)
+
+}
+
+tictoc::toc() 
+
+```
+
+
+
+
+
