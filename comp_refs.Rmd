@@ -1,0 +1,103 @@
+---
+title: "Comparing SAFRAN UERRA"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
+library(s2dverification)
+library(stats)
+library(s2dverification)
+library(ggplot2)
+library(CSTools)
+library(fanplot)
+library(dplyr)
+library(ggfan)
+
+```
+
+## Parameters 
+
+```{r }
+
+# variable
+ind <- 2
+
+# grid
+maille <- 18
+
+# temporal aggregation
+temp <- 1:6 #(entre 1 et 6)
+ntemp <- length(temp)
+
+# bootstrap and cores
+no_core <- 6
+nboot <- 100
+
+```
+
+## Loading & filtering data
+
+SAFRAN and UERRA data, matching grids selected and put side to side
+Loading 
+
+```{r }
+
+
+
+
+
+
+```
+
+## Boxplots
+
+All data in 3-months boxplot
+
+
+```{r }
+
+
+
+
+
+
+```
+
+## Time series
+
+2 curves: average of all grids
+
+
+```{r }
+
+
+
+```
+
+## Bias map
+
+2 curves: average of all grids
+
+
+```{r }
+
+
+
+```
+
+
+## Correlation map
+
+2 curves: average of all grids
+
+
+```{r }
+
+
+
+
+```
+

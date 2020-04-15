@@ -1,0 +1,176 @@
+---
+title: "Area Under Roc"
+output: html_document
+---
+
+```{r}
+
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
+library(easyVerification)
+library(verification)
+library(dplyr)
+library(stats)
+library(SpecsVerification)
+library(s2dverification)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+library(readr)
+library(purrr)
+
+```
+
+## Parameters 
+
+```{r }
+
+# temporal agregation
+temp <- 1:6
+
+# chosen quantile
+kantile <- "quint" # ter or quint
+
+# bootstrap and cores
+no_core <- 6
+nboot <- 100
+
+if (kantile=="quint"){
+  proba = 1:4/5; events = 5
+} else { proba = 1:2/3; events = 3}
+
+```
+                                            
+## Gridded scores
+
+Scores computed for each grid separately.
+Indicators are assessed on a 28 days time window and over the whole season
+
+```{r}
+
+tictoc::tic()
+
+for (ind in c(2,3,4,8)){
+  
+  cl <- makeCluster(no_core)
+  registerDoParallel(cl)
+
+foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
+
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+
+  load(file = file.path(dir_data, "extract", nom_ref))
+  load(file = file.path(dir_data, "extract", nom_prev))
+  
+  ngrids <- dim(array_obs)[1]
+
+  scoreprob <- array (NA, dim=c(ngrids,2))
+    
+  # seasonal: WARNING WITH AGREGATION METHOD!!!!
+  seas_obs <- apply(array_obs[,,temp],c(1,2), sum)
+  seas_prev <- apply(array_prev[,,,temp],c(1,2,3), sum)
+ 
+  scoreprob[,1] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=proba, parallel = TRUE)$cat1 
+  if (kantile=="quint"){
+    scoreprob[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=proba, parallel = TRUE)$cat5
+  } else { scoreprob[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=proba, parallel = TRUE)$cat3 }
+
+  nom_scoreroc <- paste0(indic[ind], b, "_", kantile, "aucgrid.RData")
+
+  save(scoreprob, file = file.path(dir_data, "score", nom_scoreroc))
+
+  }
+  
+stopCluster(cl)
+
+}
+
+tictoc::toc()
+
+```
+
+## Box-agregated scores
+
+Aggregation computed using latitude weighting   
+
+```{r}
+
+tictoc::tic()
+
+for (ind in 1:8){
+
+  list_boot <- list()
+  
+  load(file = file.path(dir_data, "extract", "lat.RData"))
+
+  for (b in 1:nboot){
+    
+    nom_prev <- paste0(indic[ind],b,"psprob_",kantile, ".RData")    
+    nom_ref <- paste0(indic[ind],b,"refbin_",kantile, ".RData")
+    load(file = file.path(dir_data, "extract", nom_prev))
+    load(file = file.path(dir_data, "extract", nom_ref))
+    
+    vect_event <- vector()
+    for (e in 1:events){ # through different quantiles
+      
+      vect_event[e] <- score_boite_prob(prob_ps, bin_ref, lat, nb_bin = 10, e)$AUC # seasonal 
+  
+      }
+ 
+   list_boot[[b]] <- vect_event2 # seasonal 
+  
+  }
+ 
+  nom_box <- paste0(indic[ind], "_", kantile, "boxauc.RData")
+  save(list_boot, file = file.path(dir_data, "score", nom_box))
+
+}
+
+tictoc::toc()
+
+```
+
+
+## Box-agregated score analysis
+
+Transform lists in a more handy format
+
+```{r}
+
+for (indicateur in indicatOrs){
+  
+   # season
+  nom_box <- paste0(indicateur, "_", kantile, "boxauc.RData")
+  load(file = file.path(dir_data, "score", nom_ps))
+  
+  sum_probbox <- apply(array(unlist(list_boot) , c(events,nboot)), 1, mean, na.rm = T)
+  
+  nom_box <- paste0(indicateur, "_", kantile, "avboxauc.RData")
+  write_csv(as.data.frame(sum_probbox), file.path(dir_data, "score", nom_seas))
+  
+}
+
+```
+
+## Box score significance test
+
+Wilcoxon test with H0: AUC non supérieure à 0.5
+
+```{r}
+indicateur <- "bilanhydr"
+indicateur <- "grassyieldC1C2_"
+lastquant <- 3 # 3 if terciles or 5
+
+  nom_box <- paste0(indicateur, "_", kantile, "boxauc.RData")
+  load(file = file.path(dir_data, "score", nom_box))
+  
+  boxboot <- array(unlist(list_boot) , c(events,nboot))
+  
+   wilcox.test(boxboot[1,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+   wilcox.test(boxboot[lastquant,], mu = 0.5, alternative = "greater", conf.level = 0.95, na.action = na.omit)$p.value
+
+
+```

@@ -1,0 +1,82 @@
+---
+title: "Probabilistic transformation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(stats)
+library(foreach)
+library(iterators)
+library(parallel)
+library(doParallel)
+library(easyVerification)
+
+```
+
+## Parameters 
+
+```{r}
+
+# temporal aggregation
+temp <- 1:6
+
+# chosen quantile
+kantile <- "quint" # ter or quint
+
+# bootstrap and cores
+no_core <- 6
+nboot <- 50
+
+if (kantile=="quint"){
+  proba = 1:4/5; e = 5
+} else { proba = 1:2/3; e = 3}
+
+```
+
+## Transforming data 
+
+Regarding 4 selected events (higher/lower tercile/quintile) reference continuous values are transformed into binary values; ensemble prevision values are transformed into probabilistic values (computed from the ensemble spread). 
+
+```{r}
+tictoc::tic()
+
+load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+
+for (ind in c(2,3,4,8)){
+  
+  cl <- makeCluster(no_core)
+  registerDoParallel(cl)
+
+foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
+
+  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  load(file = file.path(dir_data, "extract", nom_ref))
+  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  load(file = file.path(dir_data, "extract", nom_prev))
+  
+  ngrids <- dim(array_obs)[1]
+
+  int_obs <- apply(array_obs[,,temp],c(1,2), sum) ### warning !!!!!! MEAN OR SUM REGARDING INDIC ############
+  int_prev <- apply(array_prev[,,,temp],c(1,2,3), sum)
+
+  bin_ref <- array (NA, dim=c(ngrids,nan,e))
+  prob_ps <- array (NA, dim=c(ngrids,nan,e))
+  
+  for (i in 1:ngrids){
+    bin_ref[i,,] <- count2prob(convert2prob(int_obs[i,], prob = proba), type = 4)
+    prob_ps[i,,] <- count2prob(convert2prob(int_prev[i,,], prob = proba), type = 4)
+  }
+    
+  nom_prev <- paste0(indic[ind],b,"psprob_",kantile, ".RData")
+  nom_ref <- paste0(indic[ind],b,"refbin_",kantile, ".RData")
+    
+  save(prob_ps, file = file.path(dir_data, "extract", nom_prev))
+  save(bin_ref, file = file.path(dir_data, "extract", nom_ref))
+} 
+ 
+  }
+
+tictoc::toc()
+```

@@ -3,26 +3,95 @@ title: "Taylor Diagram"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
+library(plotrix)
+
 ```
 
-## R Markdown
+## Parameters 
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r }
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# variable
+ind <- 2
 
-```{r cars}
-summary(cars)
+# temporal agregation
+temp <- 4:6
+ntemp <- length(temp)
+
+# chosen quantile
+kantile <- "quint" # ter or quint
+
+# bootstrap and cores
+no_core <- 6
+nboot <- 100
+
+if (kantile=="quint"){
+  proba = 1:4/5; events = 5
+} else { proba = 1:2/3; events = 3}
+
 ```
 
-## Including Plots
+## Retrieving original data set
 
-You can also embed plots, for example:
+we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r }
+
+ps_original <- array(NA, dim=c(ngrids, nan, nrun, ntemp))
+ref_original <- array(NA, dim=c(ngrids, nan, ntemp))
+
+ for (year in an){
+ y <- which(an==year)
+
+       # bootstrap iteration index of the year selected
+    load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+     
+    list_match <- lapply(rand_year, function(x) which(year == x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+     
+     y_index <- list_match[[1]] # year index within the bootstrap iteration
+     b_index <- 1 # bootstrap iteration index
+     for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
+       if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+       else {y_index <- y_index; b_index <- b_index}
+     }
+     
+  nom_prev <- paste0(indic[ind],b_index,"_prev.RData")
+  load(file = file.path(dir_data, "extract", nom_prev))
+  ps_original[,y,,] <- array_prev[,y_index[1],,temp]
+  
+  nom_ref <- paste0(indic[ind],b_index,"_ref.RData")
+  load(file = file.path(dir_data, "extract", nom_ref))
+  ref_original[,y,] <- array_obs[,y_index[1],temp]
+}
+
+```
+## Data aggregation
+
+We compute temporal and ensemble aggregation: temporal can be a mean or a sum - ensemble mean always
+
+```{r }
+
+ps_agreg <- apply(ps_original[,,,], c(1,2,3), sum)
+ps_ensmean <- apply(ps_agreg, c(1,2), mean)
+ref_agreg <- apply(ref_original[,,], c(1,2), sum)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Taylor diagram
+
+Scores computed for each grid separately, so they are also plotted separately.
+
+```{r}
+
+taylor.diagram(ref=ref_agreg[1,], model=ps_ensmean[1,],pos.cor=FALSE)
+taylor.diagram(ref=ref_agreg[2,], model=ps_ensmean[2,],pos.cor=FALSE, add=TRUE, col= "blue")
+taylor.diagram(ref=ref_agreg[3,], model=ps_ensmean[3,],pos.cor=FALSE, add=TRUE, col= "brown")
+taylor.diagram(ref=ref_agreg[4,], model=ps_ensmean[4,],pos.cor=FALSE, add=TRUE, col= "red")
+taylor.diagram(ref=ref_agreg[5,], model=ps_ensmean[5,],pos.cor=FALSE, add=TRUE, col= "orange")
+
+```

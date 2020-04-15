@@ -1,0 +1,158 @@
+---
+title: "Mapping probabilistic forecast"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+
+library(maps)
+library(nnet)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(rgdal)
+library(sf)
+library(ggmap)
+library(maps)
+library(ggplot2)
+library(latticeExtra)
+library(sp)
+library(rgdal)
+library(sf)
+library(ggmap)
+library(mapview)
+library(ggnewscale)
+
+```
+
+## Parameters 
+
+```{r }
+
+# chosen variable
+ind <- 2
+select_year <- 2003
+
+# chosen quantile
+kantile <- "quint" # ter or quint
+extremes <- c("first", "last")
+
+# color palette for quantile probability
+palette_highquant <- c("#fc8d59","#e34a33","#b30000")
+palette_lowquant <- c("#74a9cf","#2b8cbe","#045a8d")
+white_midquant <- c("white")
+
+if (kantile=="quint"){
+  probthres = 0.35; lastquant = 5
+} else {probthres = 0.45; lastquant = 3}
+
+# score value interval
+prob_limits <- c(probthres, 0.9)
+
+```
+
+## TRICK needed TO FIND BACK REAL YEAR
+
+Bootstrapping mixed up years, we need to find "real years" back with a short trick
+
+```{r }
+
+    # bootstrap iteration index of the year selected
+load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+     
+list_match <- lapply(rand_year, function(x) which(select_year == x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+     
+y_index <- list_match[[1]] # year index within the bootstrap iteration
+b_index <- 1 # bootstrap iteration index
+
+for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
+  if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+  else {y_index <- y_index; b_index <- b_index}
+}
+
+```
+
+## Mapping probabilistic previsions through a shapefile
+
+We transform the array of quintile previsions into a shapefile containing gridded values.
+In coloured are grids with extreme quintile previsions above 45% threshold. Grids are in white when they do not comply with this condition.
+Blue palette is for the 1st quintile. The darker blue is the higher is ensemble probability on this quintile.
+Red palette is for the 1st quintile. The darker red is the higher is ensemble probability on this quintile.
+
+```{r }
+
+### BUIDLING SHAPEFILE OF MEAN MSESS VALUES AND THEIR SIGNIFICANCE ###
+
+  ## loading dataframe of prevision and grid coordinates
+
+nom_prev <- paste0(indic[ind],b_index,"psprob_",kantile, ".RData")
+load(file = file.path(dir_data, "extract", nom_prev))
+
+load(file = file.path(dir_data, "extract", "lon.RData"))
+load(file = file.path(dir_data, "extract", "lat.RData"))
+
+  
+  ## we build a matrix gathering all info needed for the shapefile:
+
+    # coordinates
+
+matrix4shp <- matrix(0, nrow = ngrids, ncol = 5)
+
+matrix4shp[,4] <- unlist(lat)
+matrix4shp[,5] <- unlist(lon)
+
+    # most likely quintile evaluation
+
+  for (i in 1:ngrids) {
+    proba <- c(prob_ps[i,y_index[1],1],prob_ps[i,y_index[1],lastquant]) # we create a vector of quintile 1 and quintile 5 proba
+    if (length(unique(proba))==2){ # we make sure there is no NA
+      quantile <- which.is.max(proba) # most likely quintile
+    if (proba[quantile] > probthres){ # likely quintile confidence has to exceed 45%
+        matrix4shp[i,quantile] <- proba[quantile]
+    }
+    }
+  }
+    
+    # setting NA when quintile prob too low or when at least one quintile prob is NA
+
+    # 1st quantile
+naindex <- which(matrix4shp[,1]==0) 
+matrix4shp[naindex,1] <- NA
+    # last quantile
+naindex <- which(matrix4shp[,2]==0) 
+matrix4shp[naindex,2] <- NA
+    # both quantiles
+matrix4shp[,3] <- NA
+naindex <- which(is.na(matrix4shp[,1]) & is.na(matrix4shp[,2])) 
+matrix4shp[naindex,3] <- 0
+
+    # building shapefile 
+    
+    # we load the dataframe previously built and transform it into a raster
+df_shp <- data.frame(matrix4shp)
+colnames(df_shp) <- c("first_quantile", "last_quantile", "middle_quantile", "lat","lon")
+coordinates(df_shp) <- ~lon+lat
+proj4string(df_shp) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+shp_confprev <- st_as_sf(df_shp)
+
+
+### MAPPING WITH GGPLOT2 ###
+
+ggmap(back_map) +
+  geom_sf(data = shp_confprev, aes(color = last_quantile), size=1.65, shape = 15) +
+  scale_color_gradientn(colours=palette_highquant, limits = prob_limits, na.value = "transparent", guide = guide_colorbar(barwidth = 10, barheight = 0.5, nbin = 5, title = "last_quantile", order = 3))+
+new_scale("color")+
+  geom_sf(data = shp_confprev, aes(color = first_quantile), size=1.65, shape = 15) + 
+  scale_color_gradientn(colours=palette_lowquant, limits = prob_limits, na.value = "transparent", guide = guide_colorbar(barwidth = 10, barheight = 0.5, nbin = 5, title = "first_quantile", order = 1)) +
+new_scale("color")+
+geom_sf(data = shp_confprev, aes(color = middle_quantile), size=1.65, shape = 15) +
+  scale_color_gradientn(colours=white_midquant, na.value = "transparent", guide = guide_colorbar(barwidth = 1.5, barheight = 0.5, label = FALSE, frame.colour = "black", title = "mid_quantile", order = 2))+
+theme(legend.direction = "horizontal",
+        legend.box = "vertical",   legend.position = "right",
+      plot.title = element_text(size = 12, hjust = 0, vjust = 1.5)) + #
+  labs(title = paste0(indic[ind]," ", select_year," season ",kantile," forecast "))
+
+```

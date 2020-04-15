@@ -5,8 +5,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
-dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
+dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure"
+
 library(easyVerification)
 library(verification)
 library(dplyr)
@@ -15,22 +17,40 @@ library(foreach)
 library(iterators)
 library(parallel)
 library(doParallel)
-no_core <- 6
-nboot <- 100
-month <- 4:6
 
 ```
+## Parameters 
 
+```{r }
+
+# temporal agregation
+temp <- 4:6
+
+# chosen quantile
+kantile <- "quint" # ter or quint
+
+# bootstrap and cores
+no_core <- 6
+nboot <- 100
+
+if (kantile=="quint"){
+  proba = 1:4/5; events = 5
+} else { proba = 1:2/3; events = 3}
+
+```
 ## Loading files
 
 We load values previously extracted and compute ensemble means (mean between runs = models), which is required to compute deterministic scores. Values are stored in 2 3 dimensionial arrays (grids+years+t), one for prevision and one for climatology.
 N.B.: 831.22 sec elapsed
 
 ```{r, echo=FALSE}
+
 for (ind in c(2,3,4,8)){
+  
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
 tictoc::tic()
+
 foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
   
   nom_ref <- paste0(indic[ind],b,"_ref.RData")
@@ -43,10 +63,10 @@ foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
 
   # CROSS VALIDATED ANOMALIES: we compute and save arrays of anomalies using cross validation scheme
   if(ind==2|ind==3|ind==4|ind==5){
-      prev_seas <- apply(array_prev[,,,month], c(1,2,3), sum) #### aggregation method to be changed!!
-      ref_seas <- apply(array_obs[,,month], c(1,2), sum)
-  } else {prev_seas <- apply(array_prev[,,,month], c(1,2,3), mean) 
-  ref_seas <- apply(array_obs[,,month], c(1,2), mean)}
+      prev_seas <- apply(array_prev[,,,temp], c(1,2,3), sum) #### aggregation method to be changed!!
+      ref_seas <- apply(array_obs[,,temp], c(1,2), sum)
+  } else {prev_seas <- apply(array_prev[,,,temp], c(1,2,3), mean) 
+  ref_seas <- apply(array_obs[,,temp], c(1,2), mean)}
   
   prev_anomaly <- array(NA,dim=c(ngrids,nan,nrun))
   obs_anomaly <- array(NA,dim=c(ngrids,nan))
