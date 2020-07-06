@@ -1,5 +1,5 @@
 ---
-title: "Determinist scores"
+title: "Deterministic scores"
 output: html_document
 ---
 
@@ -25,18 +25,14 @@ library(readr)
 ```{r }
 
 # temporal agregation
-temp <- 1:6 
-
-# chosen quantile
-kantile <- "quint" # ter or quint
+temp <- 1:4 
 
 # bootstrap and cores
 no_core <- 6
-nboot <- 50
+nboot <- 100
 
-if (kantile=="quint"){
-  proba = 1:4/5; events = 5
-} else { proba = 1:2/3; events = 3}
+# variables
+indicateurs <- c("drain", "draindef", "dtmax35", "dtmax40", "dtmoy25", "drywav", "heatwav") 
 
 ```
 
@@ -53,9 +49,10 @@ Indicators are assessed on a 28 days time window and over the whole season
 tictoc::tic()
 
 acc <- vector()
-msess <- vector()
+rmse_ps <- vector()
+rmse_clim <- vector()
 
-for (ind in c(2,3,4,8)){
+for (ind in indicateurs){
 
   cl <- makeCluster(no_core)
   registerDoParallel(cl)
@@ -63,11 +60,11 @@ for (ind in c(2,3,4,8)){
   foreach(b=1:nboot, .packages=c('easyVerification', 's2dverification')) %dopar%  { # loop on bootstrap samples
   #Spearman <- easyVerification:::EnsCorr
     
-    nom_ref <- paste0(indic[ind],b,"_ref.RData")
-    nom_prev <- paste0(indic[ind],b,"_prev.RData")
-    nom_clim <- paste0(indic[ind],b,"_clim.RData")
-    nom_an_prev <- paste0(indic[ind],b,"_anomaly_prev.RData")
-    nom_an_obs <- paste0(indic[ind],b,"_anomaly_obs.RData")
+    nom_ref <- paste0(ind,b,"_ref_uerra5.RData")
+    nom_prev <- paste0(ind,b,"_prev_uerra5.RData")
+    nom_clim <- paste0(ind,b,"_clim_uerra5.RData")
+    nom_an_prev <- paste0(ind,b,"_anomaly_prev_uerra5.RData")
+    nom_an_obs <- paste0(ind,b,"_anomaly_obs_uerra5.RData")
     
     load(file = file.path(dir_data, "extract", nom_ref))
     load(file = file.path(dir_data, "extract", nom_prev))
@@ -76,22 +73,31 @@ for (ind in c(2,3,4,8)){
     load(file = file.path(dir_data, "extract", nom_an_obs))
     
     ngrids <- dim(array_obs)[1]
-    
-    # BE CAREFUL ON AGREGATION METHOD!!!!
     det_seas <- array(NA, dim = c(ngrids,3))
-    prev_seas <- apply(array_prev[,,,temp], c(1,2,3), sum) #### aggregation method to be changed!!
-    clim_seas <- apply(array_clim[,,,temp], c(1,2,3), sum)
-    ref_seas <- apply(array_obs[,,temp], c(1,2), sum)
-  
-      # MSESS #
-    msess <- veriApply("EnsMsess", fcst=prev_seas, fcst.ref=clim_seas, obs=ref_seas, parallel = TRUE)
+    
+    if (ind=="drywav"|ind=="heatwav"){
+    prev_seas <- array_prev #### aggregation method to be changed!!
+    clim_seas <- array_clim
+    ref_seas <- array_obs
+    } else {
+          prev_seas <- apply(array_prev[,,,temp], c(1,2,3), sum) #### aggregation method to be changed!!
+          clim_seas <- apply(array_clim[,,,temp], c(1,2,3), sum)
+          ref_seas <- apply(array_obs[,,temp], c(1,2), sum)
+    }
+    
+    
+      # RMSE #
+ 
+    rmse_ps <- veriApply("EnsRmse", fcst=prev_seas, obs=ref_seas, parallel = TRUE)
+    rmse_clim <- veriApply("EnsRmse", fcst=clim_seas, obs=ref_seas, parallel = TRUE)
           
       # ACC #
+    
     acc <- veriApply("EnsCorr", fcst=prev_anomaly, obs=obs_anomaly, parallel = TRUE)
     
-    score_det <- array(c(msess, acc), dim=c(ngrids,2))
+    score_det <- array(c(acc, rmse_ps, rmse_clim), dim=c(ngrids,3))
     
-    nom_det <- paste0(indic[ind], b,"scoredet_grid.RData")
+    nom_det <- paste0(ind, b,"scoredet_grid_uerra5.RData")
   
     save(score_det, file = file.path(dir_data, "score", nom_det))
   
@@ -117,18 +123,19 @@ Indicators are assessed on a 28 days time window and over the whole season
 
 ```{r}
 
-coeff <- vector()
-seas_ps <- matrix(ncol = 2, nrow = 6)
-load(file = file.path(dir_data, "extract", "lat.RData"))
+coeff_rmsps <- vector()
+coeff_rmsclim <- vector()
+coeff_acc <- vector()
+load(file = file.path(dir_data, "extract", "lat_uerra5.RData"))
 
-for (ind in c(2,3,4,8)){
-  boot_det <- list()
+for (ind in indicateurs){
+  det_boot <- data.frame()
 
   for(b in 1:nboot)   {
     
     # loading gridded scores
   
-    nom_prevseas <- paste0(indic[ind], b,"scoredetseas_grid_prev.RData")
+    nom_prevseas <- paste0(ind, b,"scoredet_grid_uerra5.RData")
     load(file = file.path(dir_data, "score", nom_prevseas))
     ngrids <- dim(score_det)[1]
 
@@ -136,22 +143,38 @@ for (ind in c(2,3,4,8)){
   
     for (i in 1:ngrids){
       val_prevseas[[i]] <- score_det[i,]*cos(pi*lat[i]/180)
-      coeff[i] <- cos(pi*lat[i]/180)
-      # removing NAs
-      if (length(which(is.na(score_det[i,])))>0){
-        coeff[i] <- NA
-        val_prevseas[[i]] <- rep(NA,2)
+      coeff_rmsps[i] <- cos(pi*lat[i]/180)
+      coeff_rmsclim[i] <- cos(pi*lat[i]/180)
+      coeff_acc[i] <- cos(pi*lat[i]/180)
+      
+     # removing NAs
+      if (is.na(score_det[i,1])==TRUE){
+        coeff_acc[i] <- NA
       }
-    }
-  
-    det_boot[[b]] <- apply(array(unlist(val_prevseas) , c(2,ngrids)), 1, sum, na.rm = T)/sum(coeff, na.rm = T)
+      
+      if (is.na(score_det[i,2])==TRUE){
+        coeff_rmsps[i] <- NA
+      }
+      
+      if (is.na(score_det[i,3])==TRUE){
+        coeff_rmsclim[i] <- NA
+      }
+
+          }
+    
+    # grid average
+    array_score <- apply(array(unlist(val_prevseas) , c(3,ngrids)), 1, sum, na.rm = T)
+    det_boot[b,1] <- array_score[1]/sum(coeff_acc, na.rm = T)
+    det_boot[b,2] <- array_score[2]/sum(coeff_rmsps, na.rm = T)
+    det_boot[b,3] <- array_score[3]/sum(coeff_rmsclim, na.rm = T)
   }
   
-    nom_bootseas <- paste0(indic[ind], "scoredet_boot.csv")
+    nom_bootseas <- paste0(ind, "scoredet_boot_uerra5.csv")
     save(det_boot, file = file.path(dir_data, "score", nom_bootseas))
     
-    det_meanboot <- apply(array(unlist(boot_seas) , c(2,nboot)), 1, mean, na.rm=T)
-    nom_meanseas <- paste0(indic[ind], "detbox_meanboot.csv")
+    det_meanboot <- apply(det_boot, 2, mean, na.rm=T)
+    #colnames(det_meanboot) <- c("msess","acc")
+    nom_meanseas <- paste0(ind, "detbox_meanboot_uerra5.csv")
     write_csv(as.data.frame(det_meanboot), file.path(dir_data, "score", nom_meanseas))
 
 }

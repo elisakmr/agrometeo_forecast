@@ -31,7 +31,7 @@ library(purrr)
 temp <- 1:6
 
 # chosen quantile
-kantile <- "quint" # ter or quint
+kantile <- "ter" # ter or quint
 
 # bootstrap and cores
 no_core <- 6
@@ -40,6 +40,9 @@ nboot <- 100
 if (kantile=="quint"){
   proba = 1:4/5; events = 5
 } else { proba = 1:2/3; events = 3}
+
+# variables
+indicateurs <- c("drain", "draindef", "dtmax35", "dtmax40", "dtmoy25","drywav", "heatwav") 
 
 ```
                                             
@@ -52,15 +55,15 @@ Indicators are assessed on a 28 days time window and over the whole season
 
 tictoc::tic()
 
-for (ind in c(2,3,4,8)){
+for (ind in indicateurs){
   
   cl <- makeCluster(no_core)
   registerDoParallel(cl)
 
 foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
 
-  nom_ref <- paste0(indic[ind],b,"_ref.RData")
-  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  nom_ref <- paste0(ind,b,"_ref_uerra5.RData")
+  nom_prev <- paste0(ind,b,"_prev_uerra5.RData")
 
   load(file = file.path(dir_data, "extract", nom_ref))
   load(file = file.path(dir_data, "extract", nom_prev))
@@ -69,16 +72,21 @@ foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstra
 
   scoreprob <- array (NA, dim=c(ngrids,2))
     
-  # seasonal: WARNING WITH AGREGATION METHOD!!!!
-  seas_obs <- apply(array_obs[,,temp],c(1,2), sum)
-  seas_prev <- apply(array_prev[,,,temp],c(1,2,3), sum)
- 
+  if (ind=="drywav"|ind=="heatwav"){
+    seas_obs <- array_obs
+    seas_prev <- array_prev
+  } else {
+    seas_obs <- apply(array_obs[,,temp],c(1,2), sum)# seasonal: WARNING WITH AGREGATION METHOD!!!!
+    seas_prev <- apply(array_prev[,,,temp],c(1,2,3), sum)
+    
+  }
+  
   scoreprob[,1] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=proba, parallel = TRUE)$cat1 
   if (kantile=="quint"){
     scoreprob[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=proba, parallel = TRUE)$cat5
   } else { scoreprob[,2] <- veriApply("EnsRoca", fcst=seas_prev, obs=seas_obs, prob=proba, parallel = TRUE)$cat3 }
 
-  nom_scoreroc <- paste0(indic[ind], b, "_", kantile, "aucgrid.RData")
+  nom_scoreroc <- paste0(ind, b, "_", kantile, "aucgrid_uerra5.RData")
 
   save(scoreprob, file = file.path(dir_data, "score", nom_scoreroc))
 
@@ -100,31 +108,31 @@ Aggregation computed using latitude weighting
 
 tictoc::tic()
 
-for (ind in 1:8){
+for (ind in indicateurs){
 
   list_boot <- list()
   
-  load(file = file.path(dir_data, "extract", "lat.RData"))
+  load(file = file.path(dir_data, "extract", "lat_uerra5.RData"))
 
   for (b in 1:nboot){
     
-    nom_prev <- paste0(indic[ind],b,"psprob_",kantile, ".RData")    
-    nom_ref <- paste0(indic[ind],b,"refbin_",kantile, ".RData")
+    nom_prev <- paste0(ind,b,"psprob_uerra5",kantile, ".RData")    
+    nom_ref <- paste0(ind,b,"refbin_uerra5",kantile, ".RData")
     load(file = file.path(dir_data, "extract", nom_prev))
     load(file = file.path(dir_data, "extract", nom_ref))
     
     vect_event <- vector()
-    for (e in 1:events){ # through different quantiles
+    for (e in c(1:events)){ # through different quantiles
       
       vect_event[e] <- score_boite_prob(prob_ps, bin_ref, lat, nb_bin = 10, e)$AUC # seasonal 
   
       }
  
-   list_boot[[b]] <- vect_event2 # seasonal 
+   list_boot[[b]] <- vect_event # seasonal 
   
   }
  
-  nom_box <- paste0(indic[ind], "_", kantile, "boxauc.RData")
+  nom_box <- paste0(ind, "_", kantile, "boxauc_uerra5.RData")
   save(list_boot, file = file.path(dir_data, "score", nom_box))
 
 }
@@ -140,16 +148,16 @@ Transform lists in a more handy format
 
 ```{r}
 
-for (indicateur in indicatOrs){
+for (ind in indicateurs){
   
    # season
-  nom_box <- paste0(indicateur, "_", kantile, "boxauc.RData")
-  load(file = file.path(dir_data, "score", nom_ps))
+  nom_box <- paste0(ind, "_", kantile, "boxauc_uerra5.RData")
+  load(file = file.path(dir_data, "score", nom_box))
   
   sum_probbox <- apply(array(unlist(list_boot) , c(events,nboot)), 1, mean, na.rm = T)
   
-  nom_box <- paste0(indicateur, "_", kantile, "avboxauc.RData")
-  write_csv(as.data.frame(sum_probbox), file.path(dir_data, "score", nom_seas))
+  nom_boxav <- paste0(ind, "_", kantile, "avboxauc_uerra5.csv")
+  write_csv(as.data.frame(sum_probbox), file.path(dir_data, "score", nom_boxav))
   
 }
 
@@ -164,7 +172,7 @@ indicateur <- "bilanhydr"
 indicateur <- "grassyieldC1C2_"
 lastquant <- 3 # 3 if terciles or 5
 
-  nom_box <- paste0(indicateur, "_", kantile, "boxauc.RData")
+  nom_box <- paste0(indicateur, "_", kantile, "boxauc_uerra5.RData")
   load(file = file.path(dir_data, "score", nom_box))
   
   boxboot <- array(unlist(list_boot) , c(events,nboot))

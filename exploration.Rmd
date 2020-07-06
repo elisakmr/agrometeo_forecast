@@ -4,6 +4,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+
 dir_data <- "D:/HOME/ekamir/scoring_medscope/data/season" 
 dir_plot <- "D:/HOME/ekamir/scoring_medscope/figure" 
 
@@ -23,13 +24,14 @@ library(ggfan)
 ```{r }
 
 # variable
-ind <- 2
-
+indicateurs <- c("drain", "draindef", "dtmax35", "dtmax40", "dtmoy25", "drywav", "heatwav")
+indicateur <- indicateurs[6]
+  
 # grid
-maille <- 18
+maille <- 931 # avignon
 
 # temporal aggregation
-temp <- 1:6 #(entre 1 et 6)
+temp <- 1:6 #(entre 1 et 6) 
 ntemp <- length(temp)
 
 # bootstrap and cores
@@ -43,6 +45,8 @@ nboot <- 100
 we have to do a trick to find out the first bootstrapped iteration and the run index whithin this iteration matching the year we are interested in (the random sampling doesn't respect chronology)
 
 ```{r }
+
+                                            ### WITH TIME DIMENSION ###
 
 ps_original <- array(NA, dim=c(ngrids, nan, nrun, ntemp))
 ref_original <- array(NA, dim=c(ngrids, nan, ntemp))
@@ -62,13 +66,44 @@ ref_original <- array(NA, dim=c(ngrids, nan, ntemp))
        else {y_index <- y_index; b_index <- b_index}
      }
      
-  nom_prev <- paste0(indic[ind],b_index,"_prev.RData")
+  nom_prev <- paste0(indicateur,b_index,"_prev_uerra5.RData")
   load(file = file.path(dir_data, "extract", nom_prev))
   ps_original[,y,,] <- array_prev[,y_index[1],,temp]
   
-  nom_ref <- paste0(indic[ind],b_index,"_ref.RData")
+  nom_ref <- paste0(indicateur,b_index,"_ref_uerra5.RData")
   load(file = file.path(dir_data, "extract", nom_ref))
   ref_original[,y,] <- array_obs[,y_index[1],temp]
+}
+
+
+                                            ### WITHOUT TIME DIMENSION ###
+
+
+ps_original <- array(NA, dim=c(ngrids, nan, nrun))
+ref_original <- array(NA, dim=c(ngrids, nan))
+
+ for (year in an){
+ y <- which(an==year)
+
+       # bootstrap iteration index of the year selected
+    load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
+     
+    list_match <- lapply(rand_year, function(x) which(year == x)) # list of matchs between list of years randomly generated for the bootstrap and the year we are interested in
+     
+     y_index <- list_match[[1]] # year index within the bootstrap iteration
+     b_index <- 1 # bootstrap iteration index
+     for (b in 1:(nboot-1)){ # pick the first iteration and first index matching the year we are looking for
+       if (length(list_match[[b]])<1 & length(y_index)<1) {y_index <- list_match[[b+1]]; b_index <- b+1}
+       else {y_index <- y_index; b_index <- b_index}
+     }
+     
+  nom_prev <- paste0(indicateur,b_index,"_prev_uerra5.RData")
+  load(file = file.path(dir_data, "extract", nom_prev))
+  ps_original[,y,] <- array_prev[,y_index[1],]
+  
+  nom_ref <- paste0(indicateur,b_index,"_ref_uerra5.RData")
+  load(file = file.path(dir_data, "extract", nom_ref))
+  ref_original[,y] <- array_obs[,y_index[1]]
 }
 
 ```
@@ -77,16 +112,26 @@ ref_original <- array(NA, dim=c(ngrids, nan, ntemp))
 We compute temporal and ensemble aggregation: temporal can be a mean or a sum - ensemble mean always
 
 ```{r }
+                                            ### WITH TIME DIMENSION ###
 
 ps_agreg <- apply(ps_original[,,,], c(1,2,3), sum)
 ps_gridmean <- apply(ps_agreg, c(2,3), mean)
 ps_ensmean <- apply(ps_agreg, c(1,2), mean)
+ps_original <- ps_agreg
+
 ref_agreg <- apply(ref_original[,,], c(1,2), sum)
 ref_gridmean <- apply(ref_agreg, 2, mean)
+ref_original <- ref_agreg
+
+                                            ### WITHOUT TIME DIMENSION ###
+
+ps_gridmean <- apply(ps_original, c(2,3), mean)
+ps_ensmean <- apply(ps_original, c(1,2), mean)
+ref_gridmean <- apply(ref_original, 2, mean)
 
 ```
 
-## Nuage de points
+## Boxplot
 
 Attention sum ou mean selon indicateur!
 
@@ -103,22 +148,26 @@ for (y in 1:nan){
 
 }
 
+df_raw$year <- as.factor(df_raw$year)
 # plotting with ggplot2
-ggplot(df_raw, aes(x=year, y=value,  color=type)) + geom_point()+ #stat = "identity", position = "dodge"
-  labs(title = paste0(indic[ind], " spatial means"), x="Year", y= "Value")+
+
+ggplot() + geom_boxplot(df_raw %>% filter(type=="prevision"), mapping=aes(x=year, y=value), color="#dd1c77")+
+  geom_point(df_raw %>% filter(type=="ref"), mapping=aes(x=year, y=value), color="#2ca25f")+
+  #scale_colour_manual(name="Error Bars",values=cols) + scale_fill_manual(name="Bar",values=cols)
+  labs(title = paste0(indicateur, " MJJASO spatial means"), x="Year", y= "Value")+
       theme_bw()+
-       scale_x_continuous(breaks = scales::pretty_breaks(n = 12))
+       scale_x_discrete(breaks = scales::pretty_breaks(n = 12))
+
 
 # value of global difference
 df_raw %>% group_by(type) %>% summarise(mean_ps=mean(value))
 
 ```
 
-## Plot ensemble mean and spread vs observation
+## Probability function
 
 ```{r }
 
-# re shaping data: we put them in a table with 3 columns: type(ref or prevision) - year - value 
 
 df_psmean <- data.frame() # table with: type - year - value(ensemble mean)
 df_quant <- data.frame() # table with: type - year - value(ensemble quantiles)
@@ -126,36 +175,36 @@ df_ref <- data.frame() # table with: type - year - value(ensemble quantiles)
 
 for (y in 1:nan){
   
-  df_quant <- rbind(df_quant, data.frame(year=an[y], value = ps_agreg[maille, y, ]))
+  df_quant <- rbind(df_quant, data.frame(year=an[y], value = ps_original[maille, y, ]))
   df_psmean <- rbind(df_psmean, data.frame(year=an[y], value = ps_ensmean[maille, y]))
-  df_ref <- rbind(df_ref, data.frame(year=an[y], value = ref_agreg[maille, y]))
+  df_ref <- rbind(df_ref, data.frame(year=an[y], value = ref_original[maille, y]))
 }
 
 # reference terciles
-ter1_ref <- as.numeric(quantile(ref_agreg[maille, ], probs = 1/3))
-ter3_ref <- as.numeric(quantile(ref_agreg[maille, ], probs = 2/3))
+ter1_ref <- as.numeric(quantile(ref_original[maille, ], probs = 1/3))
+ter3_ref <- as.numeric(quantile(ref_original[maille, ], probs = 2/3))
 
 # ps terciles
-ter1_ps <- as.numeric(quantile(ps_agreg[maille,,], probs = 1/3))
-ter3_ps <- as.numeric(quantile(ps_agreg[maille,,], probs = 2/3))
+ter1_ps <- as.numeric(quantile(ps_original[maille,,], probs = 1/3))
+ter3_ps <- as.numeric(quantile(ps_original[maille,,], probs = 2/3))
 
 # plot with ggplot2
 p <- ggplot(df_quant, aes(x=year, y=value)) + 
-  labs(title = paste0(indic[ind], " MJJASO grid ", maille), x="Year", y= "Value")+
+  labs(title = paste0(indicateur, " MJJASO grid ", maille), x="Year", y= "Value")+
       theme_bw()+
        scale_x_continuous(breaks = scales::pretty_breaks(n = 12))
 
 ## with geom_fan extra
 p + geom_fan(data=df_quant, intervals=c(1,0.1), show.legend = FALSE) + 
-  geom_line(data=df_ref, mapping=aes(x=year,y=value), color="#a1d99b", size=0.8) +
-  geom_hline(yintercept=ter1_ref, linetype="dashed", color = "#a1d99b", size=0.2) +
-  geom_hline(yintercept=ter3_ref, linetype="dashed", color = "#a1d99b", size=0.2) +
-  geom_line(data=df_psmean, mapping=aes(x=year,y=value), color="#f03b20", size=0.8) +
-  geom_hline(yintercept=ter1_ps, linetype="dashed", color = "#f03b20", size=0.2) +
-  geom_hline(yintercept=ter3_ps, linetype="dashed", color = "#f03b20", size=0.2)
+  geom_line(data=df_ref, mapping=aes(x=year,y=value), color="#a1d99b", size=1, show.legend = TRUE) +
+  geom_hline(yintercept=ter1_ref, linetype="dashed", color = "#a1d99b", size=0.4) +
+  geom_hline(yintercept=ter3_ref, linetype="dashed", color = "#a1d99b", size=0.4) +
+  geom_line(data=df_psmean, mapping=aes(x=year,y=value), color="#f03b20", size=1) +
+  geom_hline(yintercept=ter1_ps, linetype="dashed", color = "#f03b20", size=0.4) +
+  geom_hline(yintercept=ter3_ps, linetype="dashed", color = "#f03b20", size=0.4)
 
-# checking function implementation ♥
-#p + geom_interval(data=df_quant, intervals=c(1,0.1), outliers=TRUE)
+
+
 ```
 
 

@@ -27,12 +27,15 @@ kantile <- "quint" # ter or quint
 
 # bootstrap and cores
 no_core <- 6
-nboot <- 50
+nboot <- 100
 
 if (kantile=="quint"){
   proba = 1:4/5; e = 5
 } else { proba = 1:2/3; e = 3}
 
+# variables
+#indicateurs <- c("drain", "draindef", "dtmax35", "dtmax40", "dtmoy25") #
+indicateurs <- c("drywav", "heatwav")
 ```
 
 ## Transforming data 
@@ -44,23 +47,28 @@ tictoc::tic()
 
 load(file = file.path(dir_data, "extract", "years.RData")) # list of years in each bootstrap iteration
 
-for (ind in c(2,3,4,8)){
+for (ind in indicateurs){
   
   cl <- makeCluster(no_core)
   registerDoParallel(cl)
 
 foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstrap samples
 
-  nom_ref <- paste0(indic[ind],b,"_ref.RData")
+  nom_ref <- paste0(ind,b,"_ref_uerra5.RData")
   load(file = file.path(dir_data, "extract", nom_ref))
-  nom_prev <- paste0(indic[ind],b,"_prev.RData")
+  nom_prev <- paste0(ind,b,"_prev_uerra5.RData")
   load(file = file.path(dir_data, "extract", nom_prev))
   
   ngrids <- dim(array_obs)[1]
 
-  int_obs <- apply(array_obs[,,temp],c(1,2), sum) ### warning !!!!!! MEAN OR SUM REGARDING INDIC ############
-  int_prev <- apply(array_prev[,,,temp],c(1,2,3), sum)
-
+  if (ind=="drywav"|ind=="heatwav"){
+    int_obs <- array_obs 
+    int_prev <- array_prev
+  } else {
+    int_obs <- apply(array_obs[,,temp],c(1,2), sum) ### warning !!!!!! MEAN OR SUM REGARDING INDIC ############
+    int_prev <- apply(array_prev[,,,temp],c(1,2,3), sum)
+  }
+  
   bin_ref <- array (NA, dim=c(ngrids,nan,e))
   prob_ps <- array (NA, dim=c(ngrids,nan,e))
   
@@ -69,8 +77,8 @@ foreach(b=1:nboot, .packages = 'easyVerification') %dopar%  { # loop on bootstra
     prob_ps[i,,] <- count2prob(convert2prob(int_prev[i,,], prob = proba), type = 4)
   }
     
-  nom_prev <- paste0(indic[ind],b,"psprob_",kantile, ".RData")
-  nom_ref <- paste0(indic[ind],b,"refbin_",kantile, ".RData")
+  nom_prev <- paste0(ind,b,"psprob_uerra5",kantile, ".RData")
+  nom_ref <- paste0(ind,b,"refbin_uerra5",kantile, ".RData")
     
   save(prob_ps, file = file.path(dir_data, "extract", nom_prev))
   save(bin_ref, file = file.path(dir_data, "extract", nom_ref))

@@ -33,16 +33,19 @@ library(ggnewscale)
 ```{r }
 
 # chosen variable
-ind <- 2
-select_year <- 2003
+indicateurs <- c("drain", "draindef", "dtmax35", "dtmax40", "dtmoy25", "drywav", "heatwav") 
+indicateur <- indicateurs[5]
+
+# year
+select_year <- 2003 # 2011 for water; 2003 for temperature
 
 # chosen quantile
 kantile <- "quint" # ter or quint
 extremes <- c("first", "last")
 
 # color palette for quantile probability
-palette_highquant <- c("#fc8d59","#e34a33","#b30000")
-palette_lowquant <- c("#74a9cf","#2b8cbe","#045a8d")
+ palette_lowquant <- c("#9ecae1","#2b8cbe","#08306b")
+ palette_highquant<-  c("#fdd0a2","#f16913","#a50f15")
 white_midquant <- c("white")
 
 if (kantile=="quint"){
@@ -51,6 +54,11 @@ if (kantile=="quint"){
 
 # score value interval
 prob_limits <- c(probthres, 0.9)
+
+# trick to get automatically number of grids 
+nom_ref <- paste0(indicateur,1,"_ref_uerra5.RData")
+load(file = file.path(dir_data, "extract", nom_ref))
+ngrids <- dim(array_obs)[1]
 
 ```
 
@@ -88,12 +96,10 @@ Red palette is for the 1st quintile. The darker red is the higher is ensemble pr
 
   ## loading dataframe of prevision and grid coordinates
 
-nom_prev <- paste0(indic[ind],b_index,"psprob_",kantile, ".RData")
+nom_prev <- paste0(indicateur,b_index,"psprob_uerra5",kantile, ".RData")
 load(file = file.path(dir_data, "extract", nom_prev))
 
-load(file = file.path(dir_data, "extract", "lon.RData"))
-load(file = file.path(dir_data, "extract", "lat.RData"))
-
+ 
   
   ## we build a matrix gathering all info needed for the shapefile:
 
@@ -101,8 +107,11 @@ load(file = file.path(dir_data, "extract", "lat.RData"))
 
 matrix4shp <- matrix(0, nrow = ngrids, ncol = 5)
 
-matrix4shp[,4] <- unlist(lat)
-matrix4shp[,5] <- unlist(lon)
+load(file = file.path(dir_data, "extract", "lon_uerra5.RData"))
+load(file = file.path(dir_data, "extract", "lat_uerra5.RData"))
+
+matrix4shp[,4] <- lat
+matrix4shp[,5] <- lon
 
     # most likely quintile evaluation
 
@@ -133,7 +142,7 @@ matrix4shp[naindex,3] <- 0
     
     # we load the dataframe previously built and transform it into a raster
 df_shp <- data.frame(matrix4shp)
-colnames(df_shp) <- c("first_quantile", "last_quantile", "middle_quantile", "lat","lon")
+colnames(df_shp) <- c("first_quantile", "last_quantile", "middle", "lat","lon")
 coordinates(df_shp) <- ~lon+lat
 proj4string(df_shp) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
 shp_confprev <- st_as_sf(df_shp)
@@ -142,17 +151,18 @@ shp_confprev <- st_as_sf(df_shp)
 ### MAPPING WITH GGPLOT2 ###
 
 ggmap(back_map) +
-  geom_sf(data = shp_confprev, aes(color = last_quantile), size=1.65, shape = 15) +
-  scale_color_gradientn(colours=palette_highquant, limits = prob_limits, na.value = "transparent", guide = guide_colorbar(barwidth = 10, barheight = 0.5, nbin = 5, title = "last_quantile", order = 3))+
+  geom_sf(data = shp_confprev, aes(color = last_quantile), size=0.85, shape = 15) +
+  scale_color_gradientn(colours=palette_highquant, limits = prob_limits, na.value = "transparent", guide = guide_colorbar(barwidth = 10, barheight = 0.5, nbin = 5, title = "last quantile probability", order = 3))+
 new_scale("color")+
-  geom_sf(data = shp_confprev, aes(color = first_quantile), size=1.65, shape = 15) + 
-  scale_color_gradientn(colours=palette_lowquant, limits = prob_limits, na.value = "transparent", guide = guide_colorbar(barwidth = 10, barheight = 0.5, nbin = 5, title = "first_quantile", order = 1)) +
+  geom_sf(data = shp_confprev, aes(color = first_quantile), size=0.85, shape = 15) + 
+  scale_color_gradientn(colours=palette_lowquant, limits = prob_limits, na.value = "transparent", guide = guide_colorbar(barwidth = 10, barheight = 0.5, nbin = 5, title = "1st quantile probability", order = 1)) +
 new_scale("color")+
-geom_sf(data = shp_confprev, aes(color = middle_quantile), size=1.65, shape = 15) +
-  scale_color_gradientn(colours=white_midquant, na.value = "transparent", guide = guide_colorbar(barwidth = 1.5, barheight = 0.5, label = FALSE, frame.colour = "black", title = "mid_quantile", order = 2))+
+geom_sf(data = shp_confprev, aes(color = middle), size=0.85, shape = 15) +
+  scale_color_gradientn(colours=white_midquant, na.value = "transparent", guide = guide_colorbar(barwidth = 1.5, barheight = 0.5, label = FALSE, frame.colour = "black", title = "no outstanding extreme", order = 2))+
 theme(legend.direction = "horizontal",
         legend.box = "vertical",   legend.position = "right",
       plot.title = element_text(size = 12, hjust = 0, vjust = 1.5)) + #
-  labs(title = paste0(indic[ind]," ", select_year," season ",kantile," forecast "))
+  labs(title = paste0(indicateur," ", select_year," MJJASO ",kantile," forecast "))
+
 
 ```

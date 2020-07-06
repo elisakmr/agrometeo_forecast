@@ -17,6 +17,8 @@ library(foreach)
 library(iterators)
 library(parallel)
 library(doParallel)
+library(raster)
+library(sp)
 
 ```
 ## Parameters 
@@ -24,18 +26,15 @@ library(doParallel)
 ```{r }
 
 # temporal agregation
-temp <- 4:6
-
-# chosen quantile
-kantile <- "quint" # ter or quint
+temp <- 1:6
 
 # bootstrap and cores
 no_core <- 6
 nboot <- 100
 
-if (kantile=="quint"){
-  proba = 1:4/5; events = 5
-} else { proba = 1:2/3; events = 3}
+# variables
+#indicateurs <- c("drain", "draindef", "dtmax35", "dtmax40", "dtmoy25") #
+indicateurs <- c("drywav", "heatwav")
 
 ```
 ## Loading files
@@ -45,7 +44,7 @@ N.B.: 831.22 sec elapsed
 
 ```{r, echo=FALSE}
 
-for (ind in c(2,3,4,8)){
+for (ind in indicateurs){
   
 cl <- makeCluster(no_core)
 registerDoParallel(cl)
@@ -53,20 +52,23 @@ tictoc::tic()
 
 foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
   
-  nom_ref <- paste0(indic[ind],b,"_ref.RData")
-  nom_prev <- paste0(indic[ind],b,"_prev.RData")
-  nom_clim <- paste0(indic[ind],b,"_clim.RData")
+  nom_ref <- paste0(ind,b,"_ref_uerra5.RData")
+  nom_prev <- paste0(ind,b,"_prev_uerra5.RData")
+  nom_clim <- paste0(ind,b,"_clim_uerra5.RData")
   
   load(file = file.path(dir_data, "extract", nom_ref))
   load(file = file.path(dir_data, "extract", nom_prev))
   load(file = file.path(dir_data, "extract", nom_clim))
 
   # CROSS VALIDATED ANOMALIES: we compute and save arrays of anomalies using cross validation scheme
-  if(ind==2|ind==3|ind==4|ind==5){
-      prev_seas <- apply(array_prev[,,,temp], c(1,2,3), sum) #### aggregation method to be changed!!
-      ref_seas <- apply(array_obs[,,temp], c(1,2), sum)
-  } else {prev_seas <- apply(array_prev[,,,temp], c(1,2,3), mean) 
-  ref_seas <- apply(array_obs[,,temp], c(1,2), mean)}
+  
+  if (ind=="drywav"|ind=="heatwav"){
+  prev_seas <- array_prev 
+  ref_seas <- array_obs
+  } else {  
+    prev_seas <- apply(array_prev[,,,temp], c(1,2,3), sum) #### aggregation method to be changed!!
+    ref_seas <- apply(array_obs[,,temp], c(1,2), sum)
+  }
   
   prev_anomaly <- array(NA,dim=c(ngrids,nan,nrun))
   obs_anomaly <- array(NA,dim=c(ngrids,nan))
@@ -81,8 +83,8 @@ foreach(b=1:nboot, .packages="tidyverse") %dopar%  { # loop on bootstrap samples
   }
   
 
-  nom_prev <- paste0(indic[ind],b,"_anomaly_prev.RData")
-  nom_obs <- paste0(indic[ind],b,"_anomaly_obs.RData")
+  nom_prev <- paste0(ind,b,"_anomaly_prev_uerra5.RData")
+  nom_obs <- paste0(ind,b,"_anomaly_obs_uerra5.RData")
 
   save(prev_anomaly, file = file.path(dir_data, "extract", nom_prev))
   save(obs_anomaly, file = file.path(dir_data, "extract", nom_obs))
